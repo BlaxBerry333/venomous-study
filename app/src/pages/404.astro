@@ -1,0 +1,120 @@
+---
+import DocLayout from "@layouts/DocLayout.astro";
+import { getLocaleFromUrl, t } from "@i18n/index";
+
+// Astro's static SSG uses this as the fallback for any unmatched path,
+// including /ja/<unknown>. Detect locale from URL to render the right copy.
+const locale = getLocaleFromUrl(Astro.url);
+const base = import.meta.env.BASE_URL;
+const homeHref = locale === "zh" ? base : `${base}ja/`;
+---
+
+<DocLayout
+  title={t("errors.404.pageTitle", locale)}
+  description={t("errors.404.pageDesc", locale)}
+  locale={locale}
+>
+  <div id="page-404" class="sidebar-offset">
+    <div class="error-page">
+      <div class="error-code">404</div>
+      <h1 class="error-title">{t("errors.404.title", locale)}</h1>
+      <p class="error-desc">{t("errors.404.desc", locale)}</p>
+      <div class="error-actions">
+        <a href={homeHref} class="btn">{t("errors.404.returnHome", locale)}</a>
+        <button type="button" class="btn btn--secondary" data-action="go-back">
+          {t("errors.404.goBack", locale)}
+        </button>
+      </div>
+    </div>
+  </div>
+</DocLayout>
+
+<style is:global>
+  /* E1-E11: Matches mockup.html L778-850 exactly */
+  .error-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    text-align: center;
+    padding: var(--space-12) var(--space-8);
+    padding-top: calc(var(--header-height) + var(--space-12));
+    gap: var(--space-6);
+    position: relative;
+    overflow: hidden;
+  }
+  .error-code {
+    font-family: var(--font-heading);
+    font-size: 8rem;
+    color: var(--color-primary);
+    letter-spacing: 0.1em;
+    line-height: 1;
+    font-weight: var(--font-weight-bold);
+  }
+  .error-title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-2xl);
+    color: var(--color-text);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .error-desc {
+    color: var(--color-text-secondary);
+    line-height: var(--line-height-relaxed);
+    max-width: 480px;
+  }
+  .error-actions {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Responsive: <1280px (drawer mode) */
+  @media (max-width: 1279px) {
+    .error-page {
+      padding: var(--space-6);
+      padding-top: var(--space-6);
+    }
+    .error-code {
+      font-size: 6rem;
+    }
+    .error-title {
+      font-size: var(--font-size-xl);
+    }
+  }
+
+  /* Responsive: <768px */
+  @media (max-width: 767px) {
+    .error-page {
+      padding: var(--space-4);
+    }
+    .error-code {
+      font-size: 4rem;
+    }
+    .error-title {
+      font-size: var(--font-size-lg);
+      letter-spacing: 0.1em;
+    }
+    .error-actions {
+      flex-direction: column;
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("astro:page-load", () => {
+    const btn = document.querySelector<HTMLButtonElement>(
+      '[data-action="go-back"]',
+    );
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      if (window.history.length > 1) history.back();
+      else window.location.href = "/";
+    });
+  });
+</script>

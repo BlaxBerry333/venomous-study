@@ -1,0 +1,80 @@
+---
+interface Props {
+  labelOpen: string;
+  labelClose: string;
+}
+
+const { labelOpen, labelClose } = Astro.props;
+---
+
+<button
+  class="hamburger-btn"
+  id="hamburger-btn"
+  aria-label={labelOpen}
+  aria-expanded="false"
+  aria-controls="sidebar"
+  data-label-open={labelOpen}
+  data-label-close={labelClose}
+>
+  <span class="hamburger-icon">
+    <span></span>
+    <span></span>
+    <span></span>
+  </span>
+</button>
+
+<style>
+  /* HB1-HB8: Matches mockup.html L122-152 exactly */
+  .hamburger-btn {
+    display: none;
+    position: fixed;
+    top: var(--space-2);
+    right: var(--space-2);
+    z-index: var(--z-hamburger);
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-secondary);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+  }
+  .hamburger-btn:hover {
+    background: var(--color-bg-tertiary);
+  }
+  .hamburger-btn:active {
+    transform: scale(0.95);
+  }
+  .hamburger-icon {
+    width: 20px;
+    height: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .hamburger-icon span {
+    display: block;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 1px;
+    transition:
+      transform var(--transition-normal),
+      opacity var(--transition-normal);
+  }
+  .hamburger-btn.is-open .hamburger-icon span:nth-child(1) {
+    transform: translateY(6px) rotate(45deg);
+  }
+  .hamburger-btn.is-open .hamburger-icon span:nth-child(2) {
+    opacity: 0;
+  }
+  .hamburger-btn.is-open .hamburger-icon span:nth-child(3) {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  @media (max-width: 1279px) {
+    .hamburger-btn {
+      display: flex;
+    }
+  }
+</style>

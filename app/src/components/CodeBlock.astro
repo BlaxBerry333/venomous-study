@@ -1,0 +1,53 @@
+---
+interface Props {
+  lang?: string;
+  title?: string;
+}
+
+const { lang, title } = Astro.props;
+---
+
+<div class="code-block">
+  {
+    (lang || title) && (
+      <div class="code-block-header">
+        {lang && <span class="code-block-lang">{lang}</span>}
+        {title && <span class="code-block-title">{title}</span>}
+      </div>
+    )
+  }
+  <slot />
+</div>
+
+<style>
+  /* DC17-DC22: Matches mockup.html L475-508 exactly */
+  .code-block {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+    overflow: hidden;
+  }
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-bg-tertiary);
+    border-bottom: var(--border-width) solid var(--color-border);
+    font-size: var(--font-size-sm);
+  }
+  .code-block-lang {
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+  }
+  .code-block-title {
+    color: var(--color-text-secondary);
+  }
+  .code-block :global(pre) {
+    margin: 0;
+    border-radius: 0;
+  }
+</style>

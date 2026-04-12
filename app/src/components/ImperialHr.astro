@@ -1,0 +1,44 @@
+---
+
+---
+
+<div class="imperial-hr" role="separator">
+  <div class="hr-line-left"></div>
+  <div class="hr-diamond"></div>
+  <div class="hr-line-right"></div>
+</div>
+
+<style>
+  /* HR1-HR5: Matches mockup.html L561-578 exactly */
+  .imperial-hr {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: var(--space-8) 0;
+  }
+  .imperial-hr .hr-line-left {
+    flex: 1;
+    height: var(--border-width);
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--color-border-light)
+    );
+  }
+  .imperial-hr .hr-line-right {
+    flex: 1;
+    height: var(--border-width);
+    background: linear-gradient(
+      to left,
+      transparent,
+      var(--color-border-light)
+    );
+  }
+  .imperial-hr .hr-diamond {
+    width: 8px;
+    height: 8px;
+    background: var(--color-link-hover);
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+</style>

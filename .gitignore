@@ -1,0 +1,14 @@
+.DS_Store
+Thumbs.db
+
+/.claude/
+__ai__/
+__*.md
+!teams/**
+
+node_modules/
+dist/
+reports/
+.astro/
+.env.local
+.env.*.local

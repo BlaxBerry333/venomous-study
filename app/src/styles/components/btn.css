@@ -1,0 +1,43 @@
+/* ========== Imperial CTA Button ========== */
+/* Single source of truth for primary/secondary CTA buttons. */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-6);
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all var(--transition-normal);
+  min-height: 44px;
+  text-decoration: none;
+  background: transparent;
+  cursor: pointer;
+}
+.btn:hover {
+  background: var(--color-primary);
+  color: var(--color-bg);
+  box-shadow: var(--shadow-glow-gold);
+  text-decoration: none;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
+.btn--secondary {
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+.btn--secondary:hover {
+  border-color: var(--color-link-hover);
+  color: var(--color-text);
+  background: var(--color-bg-tertiary);
+  box-shadow: none;
+}

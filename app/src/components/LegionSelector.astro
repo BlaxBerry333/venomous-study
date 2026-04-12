@@ -1,0 +1,722 @@
+---
+import { t, type Locale } from "@i18n/index";
+import {
+  DEFAULT_LEGION,
+  LOYAL_LEGIONS,
+  TRAITOR_LEGIONS,
+  legionLogoUrl,
+} from "@utils/legions";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const base = import.meta.env.BASE_URL;
+
+// Render-time views that include resolved logo URLs.
+const loyalLegions = LOYAL_LEGIONS.map((legion) => ({
+  ...legion,
+  logo: legionLogoUrl(base, legion.logoName),
+}));
+const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
+  ...legion,
+  logo: legionLogoUrl(base, legion.logoName),
+  heresyLogo: legionLogoUrl(base, legion.heresyLogoName),
+}));
+---
+
+<!-- Trigger button in sidebar -->
+<div class="legion-selector" id="legion-selector">
+  <button
+    class="legion-selector-toggle"
+    id="legion-modal-trigger"
+    aria-haspopup="dialog"
+  >
+    <img
+      class="current-legion-logo"
+      id="current-legion-logo"
+      src={`${base}legions/imperial--${DEFAULT_LEGION}.avif`}
+      alt=""
+      width="20"
+      height="20"
+    />
+    <span class="current-legion-name" id="current-legion-name">Dark Angels</span
+    >
+  </button>
+</div>
+
+<!-- Modal -->
+<div
+  class="legion-modal-backdrop"
+  id="legion-modal-backdrop"
+  aria-hidden="true"
+>
+  <div
+    class="legion-modal"
+    id="legion-modal"
+    role="dialog"
+    aria-label={t("legion.selectAria", locale)}
+    aria-modal="true"
+  >
+    <div class="legion-modal-header">
+      <h2 class="legion-modal-title">{t("legion.modalTitle", locale)}</h2>
+      <button
+        class="legion-modal-close"
+        id="legion-modal-close"
+        aria-label={t("legion.close", locale)}>&times;</button
+      >
+    </div>
+    <div class="legion-modal-body scroll-touch">
+      <div class="legion-columns">
+        <div class="legion-column">
+          <div class="legion-group-label">{t("legion.loyal", locale)}</div>
+          {
+            loyalLegions.map((legion) => (
+              <button
+                class={`legion-option${legion.id === DEFAULT_LEGION ? " is-active" : ""}`}
+                role="option"
+                aria-selected={legion.id === DEFAULT_LEGION ? "true" : "false"}
+                data-legion-value={legion.id}
+                data-legion-name={legion.name}
+              >
+                <img
+                  class="legion-logo"
+                  src={legion.logo}
+                  alt=""
+                  loading="lazy"
+                  width="24"
+                  height="24"
+                />
+                <span class="legion-option-label">{legion.label}</span>
+              </button>
+            ))
+          }
+        </div>
+        <div class="legion-column">
+          <div class="legion-group-label">{t("legion.traitor", locale)}</div>
+          {
+            traitorLegions.map((legion) => (
+              <button
+                class="legion-option"
+                role="option"
+                aria-selected="false"
+                data-legion-value={legion.id}
+                data-legion-name={legion.name}
+                data-legion-heresy-name={legion.heresyName}
+                data-has-heresy="true"
+                data-label-crusade={legion.label}
+                data-label-heresy={legion.heresyLabel}
+              >
+                <img
+                  class="legion-logo"
+                  src={legion.logo}
+                  data-logo-crusade={legion.logo}
+                  data-logo-heresy={legion.heresyLogo}
+                  alt=""
+                  loading="lazy"
+                  width="24"
+                  height="24"
+                />
+                <span class="legion-option-label">{legion.label}</span>
+                <span
+                  class="era-toggle-btn"
+                  data-era-for={legion.id}
+                  data-current-era="crusade"
+                  role="switch"
+                  aria-checked="false"
+                  aria-label={t("legion.toggleHeresy", locale)}
+                  tabindex="0"
+                >
+                  <img
+                    class="era-icon"
+                    src={`${base}legions/imperial.avif`}
+                    data-icon-crusade={`${base}legions/imperial.avif`}
+                    data-icon-heresy={`${base}legions/chaos.avif`}
+                    alt=""
+                    width="16"
+                    height="16"
+                  />
+                </span>
+              </button>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  /* Styles are global because the modal backdrop is moved to <body> at runtime
+     (to escape the Sidebar's transform context). Scoped Astro styles carry a
+     per-component hash that wouldn't match after DOM relocation across route
+     changes, leaving the backdrop unstyled and invisible on click. */
+
+  /* Trigger button in sidebar */
+  .legion-selector {
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-4);
+    border-bottom: var(--border-width) solid var(--color-border);
+  }
+  .legion-selector-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: transparent;
+    border: var(--border-width) solid var(--color-primary);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    min-height: 44px;
+    transition: background var(--transition-fast);
+  }
+  .legion-selector-toggle:hover {
+    background: var(--color-surface);
+  }
+  .current-legion-logo {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    object-fit: contain;
+    filter: brightness(0) invert(var(--logo-invert, 1));
+    opacity: 0.8;
+  }
+
+  /* Modal backdrop */
+  .legion-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 900;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .legion-modal-backdrop.is-open {
+    display: flex;
+  }
+
+  /* Modal panel */
+  .legion-modal {
+    background: var(--color-bg-secondary);
+    border: var(--border-width-thick) solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    box-shadow:
+      0 0 40px rgba(0, 0, 0, 0.6),
+      var(--shadow-glow-gold);
+    max-width: 680px;
+    width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .legion-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4) var(--space-6);
+    border-bottom: var(--border-width) solid var(--color-border);
+    background: var(--color-bg-tertiary);
+  }
+  .legion-modal-title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-xl);
+    color: var(--color-primary);
+    letter-spacing: 0.05em;
+    margin: 0;
+  }
+  .legion-modal-close {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-2xl);
+    color: var(--color-text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast);
+  }
+  .legion-modal-close:hover {
+    color: var(--color-text);
+    background: var(--color-surface);
+  }
+
+  /* Modal body */
+  .legion-modal-body {
+    padding: var(--space-4) var(--space-6);
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: min(60vh, 480px);
+  }
+
+  /* Two columns */
+  .legion-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+  }
+  .legion-group-label {
+    padding: var(--space-2) 0;
+    font-family: var(--font-heading);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: var(--border-width) solid var(--color-border);
+    margin-bottom: var(--space-1);
+  }
+
+  /* Legion option */
+  .legion-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: 2px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    text-align: left;
+    min-height: 44px;
+    border-radius: var(--radius-sm);
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .legion-option:hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+  .legion-option.is-active {
+    color: var(--color-primary);
+    background: var(--color-bg-tertiary);
+  }
+  .legion-option .legion-logo {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    object-fit: contain;
+    filter: brightness(0) invert(var(--logo-invert, 1));
+    opacity: 0.7;
+    transition: opacity var(--transition-fast);
+  }
+  .legion-option:hover .legion-logo,
+  .legion-option.is-active .legion-logo {
+    opacity: 1;
+  }
+  .legion-option-label {
+    flex: 1;
+  }
+
+  /* Era toggle: inline inside option */
+  .era-toggle-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-left: auto;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    opacity: 0.5;
+  }
+  .era-toggle-btn:hover {
+    opacity: 0.8;
+    border-color: var(--color-border);
+    background: var(--color-surface);
+  }
+  .era-toggle-btn.is-heresy {
+    opacity: 1;
+    border-color: var(--color-link-hover);
+    background: var(--era-btn-active-bg);
+  }
+  .era-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    filter: brightness(0) invert(var(--logo-invert, 1));
+    transition: transform var(--transition-fast);
+  }
+
+  /* Responsive: single column on mobile */
+  @media (max-width: 599px) {
+    .legion-columns {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+    }
+    .legion-modal {
+      width: 95vw;
+      max-height: 85vh;
+    }
+    .legion-modal-header {
+      padding: var(--space-3) var(--space-4);
+    }
+    .legion-modal-body {
+      padding: var(--space-3) var(--space-4);
+    }
+  }
+</style>
+
+<script>
+  import { DEFAULT_LEGION, LEGION_STORAGE_KEY } from "@utils/legions";
+
+  document.addEventListener("astro:page-load", () => {
+    const _trigger = document.getElementById("legion-modal-trigger");
+    const _backdrop = document.getElementById("legion-modal-backdrop");
+    const _modal = document.getElementById("legion-modal");
+    const _closeBtn = document.getElementById("legion-modal-close");
+    const _currentNameEl = document.getElementById("current-legion-name");
+    const _currentLogoEl = document.getElementById(
+      "current-legion-logo",
+    ) as HTMLImageElement | null;
+
+    if (!_trigger || !_backdrop || !_modal || !_closeBtn || !_currentNameEl)
+      return;
+
+    const trigger = _trigger;
+    const backdrop = _backdrop;
+    const modal = _modal;
+    const closeBtn = _closeBtn;
+    const currentNameEl = _currentNameEl;
+    const currentLogoEl = _currentLogoEl;
+
+    // Remember the backdrop's original parent (inside Sidebar). We move it to
+    // <body> only while open, and return it before any route change, so Astro
+    // ClientRouter (which replaces body contents on swap) doesn't clean it up.
+    const backdropOrigin = backdrop.parentNode as HTMLElement | null;
+    function moveBackdropToBody() {
+      if (backdrop.parentNode !== document.body) {
+        document.body.appendChild(backdrop);
+      }
+    }
+    function returnBackdropToOrigin() {
+      if (backdropOrigin && backdrop.parentNode !== backdropOrigin) {
+        backdropOrigin.appendChild(backdrop);
+      }
+    }
+    // Ensure it's back home before ClientRouter swaps the body.
+    document.addEventListener(
+      "astro:before-preparation",
+      returnBackdropToOrigin,
+      { once: false },
+    );
+
+    let currentLegion = DEFAULT_LEGION;
+    let currentEra: Record<string, string> = {};
+
+    // Load from localStorage
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(LEGION_STORAGE_KEY) || "{}",
+      );
+      if (saved.legion) {
+        currentLegion = saved.legion;
+        currentEra = saved.eras || {};
+      }
+    } catch {
+      /* ignore */
+    }
+
+    function openModal() {
+      // Move backdrop out of Sidebar so it can cover the full viewport
+      // regardless of the sidebar's transform (drawer mode).
+      moveBackdropToBody();
+      backdrop.classList.add("is-open");
+      backdrop.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      closeBtn.focus();
+    }
+
+    function closeModal() {
+      backdrop.classList.remove("is-open");
+      backdrop.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      trigger.focus();
+      // Return backdrop to its original home so it survives route swaps.
+      returnBackdropToOrigin();
+    }
+
+    trigger.addEventListener("click", openModal);
+    closeBtn.addEventListener("click", closeModal);
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) closeModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && backdrop.classList.contains("is-open"))
+        closeModal();
+    });
+
+    // Focus trap
+    modal.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab") return;
+      const focusable = modal.querySelectorAll("button");
+      const visible = Array.from(focusable).filter(
+        (el) => (el as HTMLElement).offsetParent !== null,
+      );
+      if (visible.length === 0) return;
+      const first = visible[0] as HTMLElement;
+      const last = visible[visible.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    // Select legion
+    modal.addEventListener("click", (e) => {
+      const option = (e.target as HTMLElement).closest(
+        ".legion-option",
+      ) as HTMLElement | null;
+      if (!option) return;
+
+      const legion = option.dataset.legionValue;
+      if (!legion) return;
+
+      // Update active state
+      modal.querySelectorAll(".legion-option").forEach((opt) => {
+        opt.classList.remove("is-active");
+        opt.setAttribute("aria-selected", "false");
+      });
+      option.classList.add("is-active");
+      option.setAttribute("aria-selected", "true");
+
+      // Update trigger button (show name only, no number/god)
+      const selectedEra = currentEra[legion] || "crusade";
+      const triggerName =
+        selectedEra === "heresy" && option.dataset.legionHeresyName
+          ? option.dataset.legionHeresyName
+          : option.dataset.legionName || "";
+      currentNameEl.textContent = triggerName;
+      const optLogo = option.querySelector(
+        ".legion-logo",
+      ) as HTMLImageElement | null;
+      if (optLogo && currentLogoEl) currentLogoEl.src = optLogo.src;
+
+      currentLegion = legion;
+      const era = currentEra[legion] || "crusade";
+      applyLegion(legion, era);
+      saveLegion();
+    });
+
+    // Era toggle: span inside option, intercept before option click
+    modal.addEventListener(
+      "click",
+      (e) => {
+        const eraBtn = (e.target as HTMLElement).closest(
+          ".era-toggle-btn",
+        ) as HTMLElement | null;
+        if (!eraBtn) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const legion = eraBtn.dataset.eraFor;
+        if (!legion) return;
+
+        const currentEraVal = eraBtn.dataset.currentEra || "crusade";
+        const newEra = currentEraVal === "crusade" ? "heresy" : "crusade";
+        eraBtn.dataset.currentEra = newEra;
+        eraBtn.setAttribute("aria-checked", String(newEra === "heresy"));
+
+        if (newEra === "heresy") {
+          eraBtn.classList.add("is-heresy");
+        } else {
+          eraBtn.classList.remove("is-heresy");
+        }
+
+        // Swap era icon
+        const eraIcon = eraBtn.querySelector(
+          ".era-icon",
+        ) as HTMLImageElement | null;
+        if (eraIcon) {
+          eraIcon.src =
+            newEra === "heresy"
+              ? eraIcon.dataset.iconHeresy || ""
+              : eraIcon.dataset.iconCrusade || "";
+        }
+
+        currentEra[legion] = newEra;
+
+        // Update the option label + logo
+        const option = modal.querySelector(
+          `.legion-option[data-legion-value="${legion}"]`,
+        ) as HTMLElement | null;
+        if (option) {
+          const labelEl = option.querySelector(".legion-option-label");
+          if (labelEl) {
+            labelEl.textContent =
+              newEra === "heresy"
+                ? option.dataset.labelHeresy || ""
+                : option.dataset.labelCrusade || "";
+          }
+
+          const logoEl = option.querySelector(
+            ".legion-logo",
+          ) as HTMLImageElement | null;
+          if (logoEl) {
+            const logoSrc =
+              newEra === "heresy"
+                ? logoEl.dataset.logoHeresy
+                : logoEl.dataset.logoCrusade;
+            if (logoSrc) logoEl.src = logoSrc;
+          }
+
+          // Update trigger if this is the active legion
+          if (currentLegion === legion) {
+            currentNameEl.textContent =
+              (newEra === "heresy"
+                ? option.dataset.legionHeresyName
+                : option.dataset.legionName) || "";
+            if (logoEl && currentLogoEl) currentLogoEl.src = logoEl.src;
+            applyLegion(legion, newEra);
+          }
+        }
+
+        saveLegion();
+      },
+      true,
+    );
+
+    let transitionTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function applyLegion(legion: string, era: string) {
+      const root = document.documentElement;
+      if (!legion) legion = DEFAULT_LEGION;
+
+      // Trigger smooth cross-fade. Class is added just before the attribute
+      // swap and removed after the transition completes so hover/focus
+      // interactions aren't affected.
+      root.classList.add("legion-transitioning");
+      if (transitionTimer) clearTimeout(transitionTimer);
+      transitionTimer = setTimeout(() => {
+        root.classList.remove("legion-transitioning");
+      }, 450);
+
+      root.setAttribute("data-legion", legion);
+      if (era === "heresy") {
+        root.setAttribute("data-legion-era", "heresy");
+      } else {
+        root.removeAttribute("data-legion-era");
+      }
+
+      // Update watermark
+      const activeOpt = modal.querySelector(
+        `.legion-option[data-legion-value="${legion}"]`,
+      );
+      const logo = activeOpt?.querySelector(
+        ".legion-logo",
+      ) as HTMLImageElement | null;
+      const watermark = document.getElementById(
+        "global-watermark",
+      ) as HTMLImageElement | null;
+      if (logo && watermark) {
+        watermark.src =
+          era === "heresy" && logo.dataset.logoHeresy
+            ? logo.dataset.logoHeresy
+            : logo.src;
+      }
+
+      // Sync favicon + apple-touch-icon to the current legion logo.
+      if (logo) {
+        const iconUrl =
+          era === "heresy" && logo.dataset.logoHeresy
+            ? logo.dataset.logoHeresy
+            : logo.src;
+        const fav = document.getElementById(
+          "favicon",
+        ) as HTMLLinkElement | null;
+        const appleTouch = document.getElementById(
+          "apple-touch-icon",
+        ) as HTMLLinkElement | null;
+        if (fav) fav.href = iconUrl;
+        if (appleTouch) appleTouch.href = iconUrl;
+      }
+    }
+
+    function saveLegion() {
+      try {
+        localStorage.setItem(
+          LEGION_STORAGE_KEY,
+          JSON.stringify({ legion: currentLegion, eras: currentEra }),
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Initial load - restore saved state
+    // Restore era toggles first
+    modal.querySelectorAll(".era-toggle-btn").forEach((btn) => {
+      const el = btn as HTMLElement;
+      const legion = el.dataset.eraFor;
+      if (legion && currentEra[legion] === "heresy") {
+        el.dataset.currentEra = "heresy";
+        el.classList.add("is-heresy");
+        el.setAttribute("aria-checked", "true");
+        // Swap era icon
+        const eraIcon = el.querySelector(
+          ".era-icon",
+        ) as HTMLImageElement | null;
+        if (eraIcon && eraIcon.dataset.iconHeresy)
+          eraIcon.src = eraIcon.dataset.iconHeresy;
+        // Update label + logo
+        const option = modal.querySelector(
+          `.legion-option[data-legion-value="${legion}"]`,
+        ) as HTMLElement | null;
+        if (option) {
+          const labelEl = option.querySelector(".legion-option-label");
+          if (labelEl) labelEl.textContent = option.dataset.labelHeresy || "";
+          const logoEl = option.querySelector(
+            ".legion-logo",
+          ) as HTMLImageElement | null;
+          if (logoEl && logoEl.dataset.logoHeresy)
+            logoEl.src = logoEl.dataset.logoHeresy;
+        }
+      }
+    });
+
+    // Restore active legion
+    if (currentLegion) {
+      modal.querySelectorAll(".legion-option").forEach((opt) => {
+        const el = opt as HTMLElement;
+        if (el.dataset.legionValue === currentLegion) {
+          el.classList.add("is-active");
+          el.setAttribute("aria-selected", "true");
+          const restoredEra = currentEra[currentLegion] || "crusade";
+          currentNameEl.textContent =
+            restoredEra === "heresy" && el.dataset.legionHeresyName
+              ? el.dataset.legionHeresyName
+              : el.dataset.legionName || "";
+          const optLogo = el.querySelector(
+            ".legion-logo",
+          ) as HTMLImageElement | null;
+          if (optLogo && currentLogoEl) currentLogoEl.src = optLogo.src;
+        } else {
+          el.classList.remove("is-active");
+          el.setAttribute("aria-selected", "false");
+        }
+      });
+      applyLegion(currentLegion, currentEra[currentLegion] || "crusade");
+    }
+  });
+</script>

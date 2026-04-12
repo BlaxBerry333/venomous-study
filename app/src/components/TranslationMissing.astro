@@ -1,0 +1,90 @@
+---
+import { t, type Locale } from "@i18n/index";
+
+interface Props {
+  locale: Locale;
+  zhSlug: string;
+}
+
+const { locale, zhSlug } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const zhHref = `${base}${zhSlug}`;
+const homeHref = `${base}ja/`;
+---
+
+<section class="translation-missing">
+  <h1 class="tm-title">{t("fallback.notTranslatedTitle", locale)}</h1>
+  <p class="tm-desc">{t("fallback.notTranslatedDesc", locale)}</p>
+  <div class="tm-actions">
+    <a class="btn" href={zhHref}>{t("fallback.viewZhVersion", locale)}</a>
+    <a class="btn btn--secondary" href={homeHref}>
+      {t("fallback.returnHome", locale)}
+    </a>
+  </div>
+</section>
+
+<style>
+  /* Fill the remaining viewport below header + breadcrumb + main padding.
+     Uses flex basis rather than magic numbers: sibling .breadcrumb has a
+     known height via min-height:44px + margin-bottom. We offset by that and
+     all ancestor vertical padding using --tm-offset (computed per breakpoint). */
+  .translation-missing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Desktop: header(44) + main pad-top(header+space-3) + main pad-bottom(space-8) + breadcrumb(44 + space-6) */
+    height: calc(
+      100vh - var(--header-height) - var(--space-3) - var(--space-8) - 44px -
+        var(--space-6)
+    );
+    height: calc(
+      100dvh - var(--header-height) - var(--space-3) - var(--space-8) - 44px -
+        var(--space-6)
+    );
+    text-align: center;
+    gap: var(--space-4);
+  }
+
+  @media (max-width: 1279px) {
+    .translation-missing {
+      /* Drawer mode (<1280): no fixed header; main pad(space-6 + space-8) + breadcrumb(44 + space-6) */
+      height: calc(
+        100vh - var(--space-6) - var(--space-8) - 44px - var(--space-6)
+      );
+      height: calc(
+        100dvh - var(--space-6) - var(--space-8) - 44px - var(--space-6)
+      );
+    }
+  }
+
+  @media (max-width: 767px) {
+    .translation-missing {
+      /* Mobile: main pad(space-4 + space-6) + breadcrumb(44 + space-6) */
+      height: calc(
+        100vh - var(--space-4) - var(--space-6) - 44px - var(--space-6)
+      );
+      height: calc(
+        100dvh - var(--space-4) - var(--space-6) - 44px - var(--space-6)
+      );
+    }
+  }
+  .tm-title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-2xl);
+    color: var(--color-primary);
+    letter-spacing: 0.05em;
+  }
+  .tm-desc {
+    color: var(--color-text-secondary);
+    line-height: var(--line-height-relaxed);
+    max-width: 520px;
+  }
+  .tm-actions {
+    display: flex;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+</style>

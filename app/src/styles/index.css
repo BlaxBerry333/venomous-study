@@ -1,0 +1,22 @@
+/* ========== Stylesheet entry ========== */
+/* Import order matters:
+     1. tokens         — CSS custom properties (colors, spacing, typography)
+     2. reset          — CSS reset + base element styles
+     3. base/*         — global effects, typography, utilities
+     4. components/*   — reusable component classes
+     5. pages/*        — page-specific styles
+     6. responsive     — global page-level responsive overrides
+   Component-internal styles stay in their .astro files (Astro scoped). */
+
+@import "./tokens.css";
+@import "./reset.css";
+
+@import "./base/effects.css";
+@import "./base/typography.css";
+@import "./base/utilities.css";
+
+@import "./components/btn.css";
+
+@import "./pages/home.css";
+
+@import "./responsive.css";

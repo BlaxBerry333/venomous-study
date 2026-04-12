@@ -1,0 +1,20 @@
+---
+import DocPage from "@components/DocPage.astro";
+import { getCollection } from "astro:content";
+import { parseDocId } from "@i18n/index";
+
+export async function getStaticPaths() {
+  const docs = await getCollection("docs");
+  return docs
+    .filter((doc) => !doc.data.draft)
+    .filter((doc) => parseDocId(doc.id).locale === "zh")
+    .map((doc) => ({
+      params: { slug: parseDocId(doc.id).slug },
+      props: { doc },
+    }));
+}
+
+const { doc } = Astro.props;
+---
+
+<DocPage doc={doc} locale="zh" />

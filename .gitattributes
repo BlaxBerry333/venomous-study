@@ -1,0 +1,22 @@
+# Ensure consistent line endings across OSes.
+* text=auto eol=lf
+
+# ==================== GitHub Linguist overrides ====================
+# The repo "language" bar on GitHub should reflect the codebase, not the
+# content authored in docs/ or the auxiliary config files.
+
+# Treat docs/ as documentation (authored content, not code).
+docs/** linguist-documentation
+
+# Strip auto-generated / vendored files from language stats.
+app/package-lock.json linguist-generated
+app/dist/** linguist-generated
+app/.astro/** linguist-generated
+
+# Count Astro components for the language bar.
+*.astro linguist-detectable=true
+*.astro linguist-language=Astro
+
+# Force markdown/mdx to not dominate stats (they're docs).
+*.md linguist-documentation
+*.mdx linguist-documentation

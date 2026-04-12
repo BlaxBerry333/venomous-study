@@ -1,0 +1,264 @@
+---
+import BaseLayout from "@layouts/BaseLayout.astro";
+import Sidebar from "@components/Sidebar.astro";
+import HamburgerButton from "@components/HamburgerButton.astro";
+import { DEFAULT_LEGION } from "@utils/legions";
+import { getLocaleFromUrl, t, type Locale } from "@i18n/index";
+
+interface Props {
+  title?: string;
+  description?: string;
+  isDocPage?: boolean;
+  locale?: Locale;
+}
+
+const { title, description, isDocPage = false } = Astro.props;
+const locale = Astro.props.locale ?? getLocaleFromUrl(Astro.url);
+const currentPath = Astro.url.pathname;
+const base = import.meta.env.BASE_URL;
+const homeHref = locale === "zh" ? base : `${base}ja/`;
+const siteName = t("site.name", locale);
+const labelOpen = t("nav.openMenu", locale);
+const labelClose = t("nav.closeMenu", locale);
+---
+
+<BaseLayout title={title} description={description} locale={locale}>
+  <HamburgerButton labelOpen={labelOpen} labelClose={labelClose} />
+  <div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
+  <Sidebar currentPath={currentPath} locale={locale} />
+
+  <header class="site-header" role="banner">
+    <a href={homeHref} class="site-title-header">{siteName}</a>
+  </header>
+
+  <img
+    id="global-watermark"
+    src={`${base}legions/imperial--${DEFAULT_LEGION}.avif`}
+    alt=""
+    aria-hidden="true"
+  />
+
+  {
+    isDocPage ? (
+      <div class="doc-page">
+        <main class="doc-main" id="main-content">
+          <slot />
+        </main>
+      </div>
+    ) : (
+      <slot />
+    )
+  }
+</BaseLayout>
+
+<style is:global>
+  /* ========== Site Header (Fixed, global) ========== */
+  .site-header {
+    position: fixed;
+    top: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    height: var(--header-height);
+    background: var(--color-bg);
+    border-bottom: var(--border-width) solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-6);
+    z-index: 500;
+  }
+  .site-title-header {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    margin-right: var(--space-8);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .site-title-header:hover {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  /* ========== Overlay ========== */
+  .nav-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--color-overlay);
+    z-index: var(--z-overlay);
+  }
+  .nav-overlay.is-visible {
+    display: block;
+  }
+
+  /* ========== Global Watermark ========== */
+  #global-watermark {
+    position: fixed;
+    top: 50%;
+    left: calc(var(--sidebar-width) + (100vw - var(--sidebar-width)) / 2);
+    transform: translate(-50%, -50%);
+    width: 35vw;
+    max-width: 400px;
+    min-width: 180px;
+    opacity: 0.025;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+    filter: brightness(0) invert(var(--logo-invert, 1));
+  }
+
+  /* ========== Main Layout ==========
+     Strategy:
+       .doc-page acts as the positioning frame. Its padding-left clears the
+       fixed Sidebar at ≥1280px. Inside, .doc-main is a centered column with
+       max-width, symmetric padding, and optional TOC reservation via :has().
+       This guarantees:
+         - Content never overlaps Sidebar (padding-left on parent).
+         - Content stays centered in the area next to Sidebar (margin: 0 auto).
+         - TOC space is reserved only when a TOC actually renders.
+         - Pages without a doc column (home/404) bypass .doc-main entirely. */
+  .doc-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    /* ≥1280px: reserve the sidebar column so content starts beside it. */
+    padding-left: var(--sidebar-width);
+  }
+  .doc-main {
+    max-width: var(--main-max-width);
+    margin: 0 auto;
+    padding: calc(var(--header-height) + var(--space-3)) var(--space-8)
+      var(--space-8) var(--space-8);
+  }
+  /* Reserve TOC column only when a TOC actually renders (TableOfContents
+     returns nothing when there are no h2/h3 headings, so :has() stays false
+     and padding stays symmetric). */
+  .doc-main:has(.toc) {
+    padding-right: var(--toc-reserve);
+  }
+
+  /* ========== Responsive: < 1280px (sidebar becomes drawer) ========== */
+  @media (max-width: 1279px) {
+    .site-header {
+      display: none;
+    }
+    #global-watermark {
+      left: 50%;
+      width: 60vw;
+      max-width: 520px;
+      min-width: 240px;
+    }
+    /* Sidebar is hidden off-canvas — drop the reserved column. */
+    .doc-page {
+      padding-left: 0;
+    }
+    .doc-main {
+      padding: var(--space-6) var(--space-6) var(--space-8) var(--space-6);
+    }
+    .doc-main:has(.toc) {
+      padding-right: var(--toc-reserve);
+    }
+  }
+
+  /* ========== Responsive: < 768px (TOC hidden, reclaim right padding) ========== */
+  @media (max-width: 767px) {
+    .doc-main {
+      padding: var(--space-4) var(--space-4) var(--space-6);
+    }
+    .doc-main:has(.toc) {
+      padding-right: var(--space-4);
+    }
+  }
+</style>
+
+<script>
+  // JS1-JS7: Sidebar toggle interaction (native JS, replaces jQuery from mockup)
+  document.addEventListener("astro:page-load", () => {
+    const sidebar = document.getElementById("sidebar");
+    const hamburger = document.getElementById("hamburger-btn");
+    const overlay = document.getElementById("nav-overlay");
+
+    if (!sidebar || !hamburger || !overlay) return;
+
+    function openSidebar() {
+      sidebar!.classList.add("is-open");
+      hamburger!.classList.add("is-open");
+      hamburger!.setAttribute("aria-expanded", "true");
+      hamburger!.setAttribute(
+        "aria-label",
+        hamburger!.dataset.labelClose || "Close navigation",
+      );
+      overlay!.classList.add("is-visible");
+      overlay!.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      // Focus first visible focusable element in sidebar
+      const firstFocusable = sidebar!.querySelector(
+        "a, button",
+      ) as HTMLElement | null;
+      if (firstFocusable) firstFocusable.focus();
+    }
+
+    function closeSidebar() {
+      sidebar!.classList.remove("is-open");
+      hamburger!.classList.remove("is-open");
+      hamburger!.setAttribute("aria-expanded", "false");
+      hamburger!.setAttribute(
+        "aria-label",
+        hamburger!.dataset.labelOpen || "Open navigation",
+      );
+      overlay!.classList.remove("is-visible");
+      overlay!.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    // JS3: Hamburger click
+    hamburger.addEventListener("click", () => {
+      if (sidebar.classList.contains("is-open")) {
+        closeSidebar();
+        hamburger.focus();
+      } else {
+        openSidebar();
+      }
+    });
+
+    // JS4: Overlay click
+    overlay.addEventListener("click", () => {
+      closeSidebar();
+      hamburger.focus();
+    });
+
+    // JS5: Escape key
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && sidebar.classList.contains("is-open")) {
+        closeSidebar();
+        hamburger.focus();
+      }
+    });
+
+    // JS6: Focus trap
+    sidebar.addEventListener("keydown", (e) => {
+      if (e.key !== "Tab" || !sidebar.classList.contains("is-open")) return;
+      const focusableElements = sidebar.querySelectorAll("a, button");
+      const visibleFocusable = Array.from(focusableElements).filter((el) => {
+        return (el as HTMLElement).offsetParent !== null;
+      });
+      if (visibleFocusable.length === 0) return;
+      const first = visibleFocusable[0] as HTMLElement;
+      const last = visibleFocusable[visibleFocusable.length - 1] as HTMLElement;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    // JS7: Window resize
+    window.addEventListener("resize", () => {
+      if (window.innerWidth >= 1280) {
+        closeSidebar();
+      }
+    });
+  });
+</script>

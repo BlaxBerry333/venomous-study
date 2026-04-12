@@ -1,0 +1,146 @@
+---
+import { getLocaleFromUrl, t, type Locale } from "@i18n/index";
+
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  headings: Heading[];
+  locale?: Locale;
+}
+
+const { headings } = Astro.props;
+const locale = Astro.props.locale ?? getLocaleFromUrl(Astro.url);
+const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{
+  tocItems.length > 0 && (
+    <nav class="toc" aria-label={t("toc.ariaLabel", locale)}>
+      <div class="toc-title">{t("toc.title", locale)}</div>
+      <ul class="toc-list">
+        {tocItems.map((heading) => (
+          <li class={`toc-item toc-depth-${heading.depth}`}>
+            <a class="toc-link" href={`#${heading.slug}`}>
+              {heading.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+<style>
+  .toc {
+    position: fixed;
+    top: calc(var(--header-height) + var(--space-6));
+    right: var(--space-6);
+    width: var(--toc-width);
+    max-height: calc(100vh - var(--header-height) - var(--space-12));
+    overflow-y: auto;
+    font-size: var(--font-size-xs);
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    z-index: 50;
+  }
+  .toc-title {
+    font-family: var(--font-heading);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: var(--border-width) solid var(--color-border);
+  }
+  .toc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .toc-item {
+    list-style: none;
+  }
+  .toc-depth-3 {
+    padding-left: var(--space-3);
+  }
+  .toc-link {
+    display: block;
+    padding: var(--space-1) var(--space-2);
+    color: var(--color-text-muted);
+    border-left: var(--border-width) solid transparent;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast);
+    line-height: var(--line-height-base);
+  }
+  .toc-link:hover {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+  .toc-link.is-active {
+    color: var(--color-primary);
+    border-left-color: var(--color-primary);
+  }
+
+  /* Tablet/drawer mode (< 1280px but ≥ 768px):
+     site-header is hidden, hamburger button occupies top-right.
+     Move TOC down to avoid overlap with hamburger button (44px + space-2 + space-2). */
+  @media (max-width: 1279px) {
+    .toc {
+      top: calc(44px + var(--space-2) + var(--space-4));
+      max-height: calc(100vh - 44px - var(--space-2) - var(--space-6));
+    }
+  }
+
+  /* Hide only on mobile — tablet (≥768px) keeps TOC while sidebar becomes drawer */
+  @media (max-width: 767px) {
+    .toc {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("astro:page-load", () => {
+    const tocLinks = document.querySelectorAll(".toc-link");
+    if (tocLinks.length === 0) return;
+
+    const headingEls = Array.from(tocLinks)
+      .map((link) => {
+        const id = link.getAttribute("href")?.slice(1);
+        return id ? document.getElementById(id) : null;
+      })
+      .filter(Boolean) as HTMLElement[];
+
+    if (headingEls.length === 0) return;
+
+    function updateActive() {
+      let current = 0;
+      const scrollY = window.scrollY + 100;
+
+      for (let i = 0; i < headingEls.length; i++) {
+        if (headingEls[i].offsetTop <= scrollY) {
+          current = i;
+        }
+      }
+
+      tocLinks.forEach((link, i) => {
+        if (i === current) {
+          link.classList.add("is-active");
+        } else {
+          link.classList.remove("is-active");
+        }
+      });
+    }
+
+    window.addEventListener("scroll", updateActive, { passive: true });
+    updateActive();
+  });
+</script>

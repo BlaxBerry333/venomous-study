@@ -1,0 +1,74 @@
+/* ========== Utility Classes ========== */
+
+/* Accessibility: visually hidden but keyboard-focusable. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.visually-hidden:focus {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  width: auto;
+  height: auto;
+  clip: auto;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary);
+  color: var(--color-bg);
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
+  z-index: 9999;
+  border-radius: var(--radius-md);
+}
+
+/* Margin offset matching sidebar width (cleared on <1280px in responsive.css). */
+.sidebar-offset {
+  margin-left: var(--sidebar-width);
+}
+
+/* iOS momentum scroll + contain overscroll. */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Minimum touch target size for a11y. */
+.touch-target {
+  min-height: 44px;
+}
+
+/* L-shaped corner decorations on top-right and bottom-right.
+   Customize via CSS vars:
+     --corner-inset:  position from edges (default space-2)
+     --corner-opacity: opacity (default 0.4)
+     --corner-color:  stroke color (default color-link-hover) */
+.corner-decoration::before,
+.corner-decoration::after {
+  content: "";
+  position: absolute;
+  width: var(--corner-length);
+  height: var(--corner-length);
+  pointer-events: none;
+  opacity: var(--corner-opacity, 0.4);
+}
+.corner-decoration::before {
+  top: var(--corner-inset, var(--space-2));
+  right: var(--corner-inset, var(--space-2));
+  border-top: var(--corner-width) solid
+    var(--corner-color, var(--color-link-hover));
+  border-right: var(--corner-width) solid
+    var(--corner-color, var(--color-link-hover));
+}
+.corner-decoration::after {
+  bottom: var(--corner-inset, var(--space-2));
+  right: var(--corner-inset, var(--space-2));
+  border-bottom: var(--corner-width) solid
+    var(--corner-color, var(--color-link-hover));
+  border-right: var(--corner-width) solid
+    var(--corner-color, var(--color-link-hover));
+}

@@ -1,0 +1,8 @@
+node_modules/
+app/dist/
+app/.astro/
+__ai__/
+.claude/
+app/package-lock.json
+.git/
+README.md

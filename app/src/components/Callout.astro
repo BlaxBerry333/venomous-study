@@ -1,0 +1,39 @@
+---
+const title = "Note";
+---
+
+<div class="callout corner-decoration" role="note">
+  <p class="callout-title">{title}</p>
+  <div class="callout-content">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .callout {
+    border-left: var(--border-width-accent) solid var(--color-primary);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text);
+    padding: var(--space-3) var(--space-4);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    margin-bottom: var(--space-4);
+    position: relative;
+    --corner-inset: var(--space-1);
+    --corner-opacity: 0.3;
+  }
+  .callout-title {
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-2);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: var(--font-heading);
+    color: var(--color-primary);
+  }
+  .callout-content {
+    font-size: var(--font-size-sm);
+  }
+  .callout-content :global(p:last-child) {
+    margin-bottom: 0;
+  }
+</style>

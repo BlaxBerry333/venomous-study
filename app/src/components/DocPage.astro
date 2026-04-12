@@ -1,0 +1,50 @@
+---
+import DocLayout from "@layouts/DocLayout.astro";
+import Breadcrumb from "@components/Breadcrumb.astro";
+import TableOfContents from "@components/TableOfContents.astro";
+import TranslationMissing from "@components/TranslationMissing.astro";
+import { render, type CollectionEntry } from "astro:content";
+import { buildBreadcrumbs } from "@utils/collections";
+import { parseDocId, type Locale } from "@i18n/index";
+
+interface Props {
+  doc: CollectionEntry<"docs">;
+  locale: Locale;
+  isFallback?: boolean;
+  /** When isFallback=true, the slug of the corresponding zh doc (without locale prefix). */
+  zhSlug?: string;
+}
+
+const { doc, locale, isFallback = false, zhSlug } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const { slug } = parseDocId(doc.id);
+
+const rendered = isFallback ? null : await render(doc);
+const Content = rendered?.Content;
+const headings = rendered?.headings ?? [];
+
+const crumbs = buildBreadcrumbs(slug, base, locale);
+---
+
+<DocLayout
+  title={doc.data.title}
+  description={doc.data.description}
+  isDocPage
+  locale={locale}
+>
+  <Breadcrumb crumbs={crumbs} />
+  {
+    isFallback && zhSlug ? (
+      <TranslationMissing locale={locale} zhSlug={zhSlug} />
+    ) : (
+      Content && (
+        <>
+          <article class="doc-content">
+            <Content />
+          </article>
+          <TableOfContents headings={headings} locale={locale} />
+        </>
+      )
+    )
+  }
+</DocLayout>

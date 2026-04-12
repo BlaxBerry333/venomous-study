@@ -1,0 +1,122 @@
+---
+interface NavEntry {
+  label: string;
+  href?: string;
+  children?: NavEntry[];
+  isGroup?: boolean;
+}
+
+interface Props {
+  items: NavEntry[];
+  currentPath: string;
+  ariaLabel?: string;
+}
+
+const { items, currentPath, ariaLabel = "Documentation" } = Astro.props;
+
+function isActive(href: string | undefined, current: string): boolean {
+  if (!href) return false;
+  const normalizedHref = href.replace(/\/$/, "");
+  const normalizedCurrent = current.replace(/\/$/, "");
+  return normalizedHref === normalizedCurrent;
+}
+---
+
+<nav class="sidebar-nav" aria-label={ariaLabel}>
+  <ul class="sidebar-list">
+    {
+      items.map((item) => (
+        <li class="nav-item">
+          {item.isGroup ? (
+            <>
+              <span class="nav-group-label">{item.label}</span>
+              {item.children && item.children.length > 0 && (
+                <ul class="nav-children">
+                  {item.children.map((child) => (
+                    <li class="nav-item">
+                      <a
+                        class={`nav-link${isActive(child.href, currentPath) ? " active" : ""}`}
+                        href={child.href}
+                        {...(isActive(child.href, currentPath)
+                          ? { "aria-current": "page" as const }
+                          : {})}
+                      >
+                        {child.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : (
+            <a
+              class={`nav-link${isActive(item.href, currentPath) ? " active" : ""}`}
+              href={item.href}
+              {...(isActive(item.href, currentPath)
+                ? { "aria-current": "page" as const }
+                : {})}
+            >
+              {item.label}
+            </a>
+          )}
+        </li>
+      ))
+    }
+  </ul>
+</nav>
+
+<style>
+  /* SN1-SN7: Matches mockup.html L318-358 exactly */
+  .sidebar-nav {
+    font-size: var(--font-size-sm);
+  }
+  .sidebar-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+  }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    transition:
+      color var(--transition-fast),
+      background var(--transition-fast);
+    border-left: var(--border-width-accent) solid transparent;
+    min-height: 44px;
+  }
+  .nav-link:hover {
+    color: var(--color-text);
+    background: var(--color-surface);
+    text-decoration: none;
+  }
+  .nav-link.active {
+    color: var(--color-primary);
+    background: var(--color-surface);
+    border-left-color: var(--color-primary);
+  }
+  /* Group label sits to the left of the nav items to create visual hierarchy
+     without indenting children, so children stay aligned with sibling controls
+     (e.g. the legion selector) in the sidebar. */
+  .nav-group-label {
+    display: block;
+    padding: var(--space-2) 0;
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    text-transform: capitalize;
+    margin-top: var(--space-3);
+  }
+  .nav-children {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+</style>

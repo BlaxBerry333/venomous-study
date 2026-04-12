@@ -1,0 +1,71 @@
+---
+import DocPage from "@components/DocPage.astro";
+import { getCollection, type CollectionEntry } from "astro:content";
+import { parseDocId } from "@i18n/index";
+
+export async function getStaticPaths() {
+  const allDocs = await getCollection("docs");
+  const published = allDocs.filter((doc) => !doc.data.draft);
+
+  // Partition into zh and ja by parsed id
+  const zhDocs = published.filter((doc) => parseDocId(doc.id).locale === "zh");
+  const jaDocs = published.filter((doc) => parseDocId(doc.id).locale === "ja");
+  const jaBySlug = new Map<string, CollectionEntry<"docs">>();
+  for (const d of jaDocs) {
+    jaBySlug.set(parseDocId(d.id).slug, d);
+  }
+  const zhBySlug = new Map<string, CollectionEntry<"docs">>();
+  for (const d of zhDocs) {
+    zhBySlug.set(parseDocId(d.id).slug, d);
+  }
+
+  const paths: Array<{
+    params: { slug: string };
+    props: {
+      doc: CollectionEntry<"docs">;
+      isFallback: boolean;
+      zhSlug?: string;
+    };
+  }> = [];
+  const covered = new Set<string>();
+
+  // 1) For every zh doc, produce either the ja translation or a fallback entry.
+  for (const zhDoc of zhDocs) {
+    const { slug } = parseDocId(zhDoc.id);
+    const jaDoc = jaBySlug.get(slug);
+    if (jaDoc) {
+      paths.push({
+        params: { slug },
+        props: { doc: jaDoc, isFallback: false },
+      });
+    } else {
+      paths.push({
+        params: { slug },
+        props: { doc: zhDoc, isFallback: true, zhSlug: slug },
+      });
+    }
+    covered.add(slug);
+  }
+
+  // 2) Orphan ja docs (no zh counterpart): emit ja route only, warn.
+  for (const jaDoc of jaDocs) {
+    const { slug } = parseDocId(jaDoc.id);
+    if (covered.has(slug)) continue;
+    if (!zhBySlug.has(slug)) {
+      console.warn(
+        `[i18n] orphan .ja.md without .md counterpart: "${slug}". ja route will be generated, but zh route is missing.`,
+      );
+      paths.push({
+        params: { slug },
+        props: { doc: jaDoc, isFallback: false },
+      });
+    }
+  }
+
+  return paths;
+}
+
+const { doc, isFallback, zhSlug } = Astro.props;
+---
+
+<DocPage doc={doc} locale="ja" isFallback={isFallback} zhSlug={zhSlug} />

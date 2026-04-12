@@ -1,0 +1,147 @@
+---
+import LegionSelector from "@components/LegionSelector.astro";
+import LanguageSwitcher from "@components/LanguageSwitcher.astro";
+import NavItem from "@components/NavItem.astro";
+import { getPublishedDocs } from "@utils/collections";
+import { parseDocId, t, type Locale } from "@i18n/index";
+
+interface Props {
+  currentPath: string;
+  locale: Locale;
+}
+
+const { currentPath, locale } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const docs = await getPublishedDocs(locale);
+const localePrefix = locale === "zh" ? "" : "ja/";
+const sidebarPersistName = `sidebar-${locale}`;
+
+// Build navigation tree from docs
+interface NavEntry {
+  label: string;
+  href?: string;
+  children?: NavEntry[];
+  isGroup?: boolean;
+}
+
+const categoryMap = new Map<string, NavEntry[]>();
+
+for (const doc of docs) {
+  const { slug } = parseDocId(doc.id);
+  const parts = slug.split("/");
+  const category = parts.length > 1 ? parts[0] : "uncategorized";
+
+  if (!categoryMap.has(category)) {
+    categoryMap.set(category, []);
+  }
+
+  categoryMap.get(category)!.push({
+    label: doc.data.title,
+    href: `${base}${localePrefix}${slug}`,
+  });
+}
+
+function translateCategory(name: string): string {
+  const key = `categories.${name}`;
+  const translated = t(key, locale);
+  // If the key is missing, t() returns the key itself; fall back to capitalized raw name.
+  if (translated === key) {
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  return translated;
+}
+
+const navItems: NavEntry[] = [];
+for (const [category, children] of categoryMap) {
+  navItems.push({
+    label: translateCategory(category),
+    isGroup: true,
+    children,
+  });
+}
+---
+
+<aside
+  class="doc-sidebar corner-decoration"
+  id="sidebar"
+  aria-label={t("sidebar.ariaLabel", locale)}
+  transition:persist={sidebarPersistName}
+>
+  <div class="sidebar-inner scroll-touch">
+    <a class="sidebar-home" href={`${base}${localePrefix}`}>
+      {t("site.name", locale)}
+    </a>
+    <LanguageSwitcher currentLocale={locale} currentPath={currentPath} />
+    <LegionSelector locale={locale} />
+    <NavItem
+      items={navItems}
+      currentPath={currentPath}
+      ariaLabel={t("sidebar.docsAriaLabel", locale)}
+    />
+  </div>
+</aside>
+
+<script>
+  // Update active nav-link after page navigation (sidebar is persisted across routes)
+  document.addEventListener("astro:after-swap", () => {
+    const currentPath = window.location.pathname.replace(/\/$/, "");
+    document.querySelectorAll(".sidebar-nav .nav-link").forEach((link) => {
+      const href = link.getAttribute("href")?.replace(/\/$/, "");
+      if (href === currentPath) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.classList.remove("active");
+        link.removeAttribute("aria-current");
+      }
+    });
+  });
+</script>
+
+<style>
+  /* SB1-SB6, SH1-SH2: Matches mockup.html L162-210 exactly */
+  .doc-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: var(--color-bg-tertiary);
+    border-right: var(--border-width) solid var(--color-border);
+    overflow: hidden;
+    z-index: var(--z-sidebar);
+  }
+  .sidebar-inner {
+    padding: var(--space-4) var(--space-4) var(--space-6);
+    overflow-y: auto;
+    height: 100%;
+  }
+  /* Sidebar home link */
+  .sidebar-home {
+    display: block;
+    font-family: var(--font-heading);
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-lg);
+    color: var(--color-primary);
+    padding: var(--space-2) 0;
+    margin-bottom: var(--space-4);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+  .sidebar-home:hover {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  /* Responsive: <1280px — sidebar becomes drawer (including tablet range) */
+  @media (max-width: 1279px) {
+    .doc-sidebar {
+      transform: translateX(-100%);
+      transition: transform var(--transition-slow);
+      z-index: var(--z-sidebar);
+    }
+    .doc-sidebar.is-open {
+      transform: translateX(0);
+    }
+  }
+</style>

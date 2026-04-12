@@ -1,0 +1,881 @@
+/* ========== Design Tokens: Warhammer 40K Imperial Theme ========== */
+/* Copied from design-tokens.css + supplementary tokens */
+
+:root {
+  /* ===== Colors: Background (Default: Dark Angels) ===== */
+  --color-bg: #0e2818;
+  --color-bg-secondary: #0c2215;
+  --color-bg-tertiary: #173020;
+  --color-surface: #1d3828;
+
+  /* ===== Colors: Text (Default: Dark Angels) ===== */
+  --color-text: #c8d8cc;
+  --color-text-secondary: rgba(200, 216, 204, 0.7);
+  --color-text-muted: rgba(200, 216, 204, 0.45);
+
+  /* ===== Colors: Border (Default: Dark Angels) ===== */
+  --color-border: #1e4028;
+  --color-border-light: #265030;
+
+  /* ===== Colors: Primary (Default: Dark Angels) ===== */
+  --color-primary: #3a6a48;
+
+  /* ===== Colors: Link ===== */
+  --color-link: #3a6a48;
+  --color-link-hover: #4a8058;
+
+  /* ===== Typography =====
+     Font stacks mix Latin display/serif with CJK serif so Chinese/Japanese
+     glyphs stay in the same gothic-imperial register as Cinzel / Crimson Text.
+     The browser per-character fallback picks Cinzel for Latin, Noto Serif SC
+     for Simplified Chinese, Noto Serif JP for Japanese. */
+  --font-heading:
+    "Cinzel", "Noto Serif SC", "Noto Serif JP", "Songti SC", "Yu Mincho",
+    "Times New Roman", serif;
+  --font-sans:
+    "Crimson Text", "Noto Serif SC", "Noto Serif JP", Georgia, "Songti SC",
+    "Yu Mincho", "Times New Roman", serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SFMono-Regular", "SF Mono", Menlo,
+    Consolas, monospace;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  --line-height-tight: 1.25;
+  --line-height-base: 1.65;
+  --line-height-relaxed: 1.75;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ===== Spacing ===== */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ===== Border & Radius ===== */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --border-width: 1px;
+  --border-width-thick: 2px;
+  --border-width-accent: 3px;
+
+  /* ===== Shadows ===== */
+  --shadow-glow-gold:
+    0 0 8px rgba(58, 106, 72, 0.3), 0 0 16px rgba(58, 106, 72, 0.15);
+  --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  /* ===== Transitions ===== */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+  --transition-glow: 300ms ease-in-out;
+
+  /* ===== Layout ===== */
+  --sidebar-width: 260px;
+  /* Doc prose column (inside .doc-main). */
+  --content-max-width: 48rem;
+  /* Home page hero/category grid container. Wider than the doc column because
+     the home is a card-browsing surface, not a long-form reading surface. */
+  --page-max-width: 90rem;
+  /* Doc page .doc-main cap: prevents the content column from drifting far
+     from the sidebar on ultra-wide monitors while still leaving room for TOC. */
+  --main-max-width: 80rem;
+  --header-height: 56px;
+  --toc-width: 200px;
+  /* Total horizontal space reserved on .doc-main for the TOC to float on the right
+     (TOC width + its right inset + a gap between TOC and content). */
+  --toc-reserve: calc(var(--toc-width) + var(--space-6) + var(--space-8));
+
+  /* ===== Z-Index ===== */
+  --z-overlay: 600;
+  --z-sidebar: 700;
+  --z-hamburger: 800;
+
+  /* ===== Decorative ===== */
+  --rivet-size: 6px;
+  --corner-length: 14px;
+  --corner-width: 2px;
+
+  /* ===== Overlay ===== */
+  --color-overlay: rgba(0, 0, 0, 0.6);
+
+  /* ===== Legion defaults (Dark Angels) ===== */
+  --legion-primary: #0e2818;
+  --legion-secondary: #3a6a48;
+  --legion-accent: #4a8058;
+  --legion-glow: rgba(58, 106, 72, 0.3);
+  --legion-text: #c8d8cc;
+
+  /* ===== Supplementary tokens (not in design-tokens.css) ===== */
+  --link-underline-color: rgba(58, 106, 72, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(58, 106, 72, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(58, 106, 72, 0.5);
+  --era-btn-active-bg: rgba(58, 106, 72, 0.1);
+  --logo-invert: 1;
+}
+
+/* ========== Legion Color Schemes (18 Legions) ========== */
+/* Each legion pre-computes all derived color variables to avoid JS runtime calculation */
+
+/* I. Dark Angels [LOYAL] */
+[data-legion="dark-angels"] {
+  --legion-primary: #0e2818;
+  --legion-secondary: #3a6a48;
+  --legion-accent: #4a8058;
+  --legion-glow: rgba(58, 106, 72, 0.3);
+  --legion-text: #c8d8cc;
+  --color-bg: #0e2818;
+  --color-bg-secondary: #0c2214;
+  --color-bg-tertiary: #21392a;
+  --color-surface: #2b4234;
+  --color-text: #c8d8cc;
+  --color-text-secondary: rgba(200, 216, 204, 0.7);
+  --color-text-muted: rgba(200, 216, 204, 0.45);
+  --color-border: #32483b;
+  --color-border-light: #43574b;
+  --color-primary: #3a6a48;
+  --color-link: #3a6a48;
+  --color-link-hover: #4a8058;
+  --shadow-glow-gold:
+    0 0 8px rgba(58, 106, 72, 0.3), 0 0 16px rgba(58, 106, 72, 0.15);
+  --link-underline-color: rgba(58, 106, 72, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(58, 106, 72, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(58, 106, 72, 0.5);
+  --era-btn-active-bg: rgba(58, 106, 72, 0.1);
+  --logo-invert: 1;
+}
+
+/* III. Emperor's Children [TRAITOR, Crusade] */
+[data-legion="emperors-children"] {
+  --legion-primary: #3a1a5a;
+  --legion-secondary: #c878d8;
+  --legion-accent: #d4b040;
+  --legion-glow: rgba(200, 120, 216, 0.3);
+  --legion-text: #d8c0e0;
+  --color-bg: #3a1a5a;
+  --color-bg-secondary: #31164c;
+  --color-bg-tertiary: #4a2c67;
+  --color-surface: #52356e;
+  --color-text: #d8c0e0;
+  --color-text-secondary: rgba(216, 192, 224, 0.7);
+  --color-text-muted: rgba(216, 192, 224, 0.45);
+  --color-border: #583c73;
+  --color-border-light: #654c7e;
+  --color-primary: #c878d8;
+  --color-link: #c878d8;
+  --color-link-hover: #d4b040;
+  --shadow-glow-gold:
+    0 0 8px rgba(200, 120, 216, 0.3), 0 0 16px rgba(200, 120, 216, 0.15);
+  --link-underline-color: rgba(200, 120, 216, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(200, 120, 216, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(200, 120, 216, 0.5);
+  --era-btn-active-bg: rgba(200, 120, 216, 0.1);
+  --logo-invert: 1;
+}
+/* III. Emperor's Children -- Heresy: Slaanesh */
+[data-legion="emperors-children"][data-legion-era="heresy"] {
+  --legion-primary: #2a0a3a;
+  --legion-secondary: #a558cc;
+  --legion-accent: #6a2878;
+  --legion-glow: rgba(170, 58, 170, 0.4);
+  --legion-text: #b8a0b8;
+  --color-bg: #2a0a3a;
+  --color-bg-secondary: #240831;
+  --color-bg-tertiary: #3b1e4a;
+  --color-surface: #442752;
+  --color-text: #b8a0b8;
+  --color-text-secondary: rgba(184, 160, 184, 0.7);
+  --color-text-muted: rgba(184, 160, 184, 0.45);
+  --color-border: #4a2f58;
+  --color-border-light: #594065;
+  --color-primary: #a558cc;
+  --color-link: #a558cc;
+  --color-link-hover: #6a2878;
+  --shadow-glow-gold:
+    0 0 8px rgba(170, 58, 170, 0.4), 0 0 16px rgba(170, 58, 170, 0.2);
+  --link-underline-color: rgba(165, 88, 204, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(165, 88, 204, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(165, 88, 204, 0.5);
+  --era-btn-active-bg: rgba(165, 88, 204, 0.1);
+  --logo-invert: 1;
+}
+
+/* IV. Iron Warriors [TRAITOR, Crusade] */
+[data-legion="iron-warriors"] {
+  --legion-primary: #2a2a2a;
+  --legion-secondary: #a0a0a0;
+  --legion-accent: #d4c43a;
+  --legion-glow: rgba(160, 160, 160, 0.3);
+  --legion-text: #d8d8d0;
+  --color-bg: #2a2a2a;
+  --color-bg-secondary: #242424;
+  --color-bg-tertiary: #3b3b3b;
+  --color-surface: #444444;
+  --color-text: #d8d8d0;
+  --color-text-secondary: rgba(216, 216, 208, 0.7);
+  --color-text-muted: rgba(216, 216, 208, 0.45);
+  --color-border: #4a4a4a;
+  --color-border-light: #595959;
+  --color-primary: #a0a0a0;
+  --color-link: #a0a0a0;
+  --color-link-hover: #d4c43a;
+  --shadow-glow-gold:
+    0 0 8px rgba(160, 160, 160, 0.3), 0 0 16px rgba(160, 160, 160, 0.15);
+  --link-underline-color: rgba(160, 160, 160, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(160, 160, 160, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(160, 160, 160, 0.5);
+  --era-btn-active-bg: rgba(160, 160, 160, 0.1);
+  --logo-invert: 1;
+}
+/* IV. Iron Warriors -- Heresy: Chaos Undivided */
+[data-legion="iron-warriors"][data-legion-era="heresy"] {
+  --legion-primary: #1e1e1e;
+  --legion-secondary: #909090;
+  --legion-accent: #c0b030;
+  --legion-glow: rgba(140, 140, 140, 0.3);
+  --legion-text: #d0d0c8;
+  --color-bg: #1e1e1e;
+  --color-bg-secondary: #1a1a1a;
+  --color-bg-tertiary: #303030;
+  --color-surface: #393939;
+  --color-text: #d0d0c8;
+  --color-text-secondary: rgba(208, 208, 200, 0.7);
+  --color-text-muted: rgba(208, 208, 200, 0.45);
+  --color-border: #404040;
+  --color-border-light: #505050;
+  --color-primary: #909090;
+  --color-link: #909090;
+  --color-link-hover: #c0b030;
+  --shadow-glow-gold:
+    0 0 8px rgba(140, 140, 140, 0.3), 0 0 16px rgba(140, 140, 140, 0.15);
+  --link-underline-color: rgba(144, 144, 144, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(144, 144, 144, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(144, 144, 144, 0.5);
+  --era-btn-active-bg: rgba(144, 144, 144, 0.1);
+  --logo-invert: 1;
+}
+
+/* V. White Scars [LOYAL] */
+[data-legion="white-scars"] {
+  --legion-primary: #e8e8d8;
+  --legion-secondary: #d54848;
+  --legion-accent: #b84040;
+  --legion-glow: rgba(186, 42, 42, 0.12);
+  --legion-text: #1a1a0a;
+  --color-bg: #e8e8d8;
+  --color-bg-secondary: #ddddd0;
+  --color-bg-tertiary: #f0f0e4;
+  --color-surface: #f2f2e6;
+  --color-text: #1a1a0a;
+  --color-text-secondary: rgba(26, 26, 10, 0.6);
+  --color-text-muted: rgba(26, 26, 10, 0.4);
+  --color-border: #c8c8b8;
+  --color-border-light: #d0d0c0;
+  --color-primary: #d54848;
+  --color-link: #d54848;
+  --color-link-hover: #b84040;
+  --shadow-glow-gold:
+    0 0 8px rgba(186, 42, 42, 0.12), 0 0 16px rgba(186, 42, 42, 0.06);
+  --link-underline-color: rgba(213, 72, 72, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(213, 72, 72, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(213, 72, 72, 0.5);
+  --era-btn-active-bg: rgba(213, 72, 72, 0.1);
+  --logo-invert: 0;
+}
+
+/* VI. Space Wolves [LOYAL] */
+[data-legion="space-wolves"] {
+  --legion-primary: #2a4a5a;
+  --legion-secondary: #8aaaba;
+  --legion-accent: #c8a840;
+  --legion-glow: rgba(138, 170, 186, 0.35);
+  --legion-text: #d8e8f0;
+  --color-bg: #2a4a5a;
+  --color-bg-secondary: #243f4c;
+  --color-bg-tertiary: #3b5867;
+  --color-surface: #44606e;
+  --color-text: #d8e8f0;
+  --color-text-secondary: rgba(216, 232, 240, 0.7);
+  --color-text-muted: rgba(216, 232, 240, 0.45);
+  --color-border: #4a6573;
+  --color-border-light: #59727e;
+  --color-primary: #8aaaba;
+  --color-link: #8aaaba;
+  --color-link-hover: #c8a840;
+  --shadow-glow-gold:
+    0 0 8px rgba(138, 170, 186, 0.35), 0 0 16px rgba(138, 170, 186, 0.175);
+  --link-underline-color: rgba(138, 170, 186, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(138, 170, 186, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(138, 170, 186, 0.5);
+  --era-btn-active-bg: rgba(138, 170, 186, 0.1);
+  --logo-invert: 1;
+}
+
+/* VII. Imperial Fists [LOYAL] */
+[data-legion="imperial-fists"] {
+  --legion-primary: #d4c43a;
+  --legion-secondary: #8a2818;
+  --legion-accent: #5a4a10;
+  --legion-glow: rgba(42, 42, 10, 0.15);
+  --legion-text: #1a1a0a;
+  --color-bg: #d4c43a;
+  --color-bg-secondary: #b4a731;
+  --color-bg-tertiary: #d7c94a;
+  --color-surface: #d9cb52;
+  --color-text: #1a1a0a;
+  --color-text-secondary: rgba(26, 26, 10, 0.7);
+  --color-text-muted: rgba(26, 26, 10, 0.45);
+  --color-border: #dacd58;
+  --color-border-light: #ddd165;
+  --color-primary: #8a2818;
+  --color-link: #8a2818;
+  --color-link-hover: #5a4a10;
+  --shadow-glow-gold:
+    0 0 8px rgba(42, 42, 10, 0.15), 0 0 16px rgba(42, 42, 10, 0.075);
+  --link-underline-color: rgba(138, 40, 24, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(138, 40, 24, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(138, 40, 24, 0.5);
+  --era-btn-active-bg: rgba(138, 40, 24, 0.1);
+  --logo-invert: 0;
+}
+
+/* VIII. Night Lords [TRAITOR, Crusade] */
+[data-legion="night-lords"] {
+  --legion-primary: #0a1020;
+  --legion-secondary: #587baf;
+  --legion-accent: #6a1818;
+  --legion-glow: rgba(74, 106, 154, 0.3);
+  --legion-text: #c8d8e8;
+  --color-bg: #0a1020;
+  --color-bg-secondary: #080e1b;
+  --color-bg-tertiary: #1e2332;
+  --color-surface: #272d3b;
+  --color-text: #c8d8e8;
+  --color-text-secondary: rgba(200, 216, 232, 0.7);
+  --color-text-muted: rgba(200, 216, 232, 0.45);
+  --color-border: #2f3441;
+  --color-border-light: #404551;
+  --color-primary: #587baf;
+  --color-link: #587baf;
+  --color-link-hover: #6a1818;
+  --shadow-glow-gold:
+    0 0 8px rgba(74, 106, 154, 0.3), 0 0 16px rgba(74, 106, 154, 0.15);
+  --link-underline-color: rgba(88, 123, 175, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(88, 123, 175, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(88, 123, 175, 0.5);
+  --era-btn-active-bg: rgba(88, 123, 175, 0.1);
+  --logo-invert: 1;
+}
+/* VIII. Night Lords -- Heresy: Chaos Undivided */
+[data-legion="night-lords"][data-legion-era="heresy"] {
+  --legion-primary: #080c1a;
+  --legion-secondary: #4a6a9a;
+  --legion-accent: #5a1010;
+  --legion-glow: rgba(60, 90, 140, 0.3);
+  --legion-text: #c0d0e0;
+  --color-bg: #080c1a;
+  --color-bg-secondary: #070a16;
+  --color-bg-tertiary: #1c1f2c;
+  --color-surface: #262935;
+  --color-text: #c0d0e0;
+  --color-text-secondary: rgba(192, 208, 224, 0.7);
+  --color-text-muted: rgba(192, 208, 224, 0.45);
+  --color-border: #2d303c;
+  --color-border-light: #3e414c;
+  --color-primary: #4a6a9a;
+  --color-link: #4a6a9a;
+  --color-link-hover: #5a1010;
+  --shadow-glow-gold:
+    0 0 8px rgba(60, 90, 140, 0.3), 0 0 16px rgba(60, 90, 140, 0.15);
+  --link-underline-color: rgba(74, 106, 154, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(74, 106, 154, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(74, 106, 154, 0.5);
+  --era-btn-active-bg: rgba(74, 106, 154, 0.1);
+  --logo-invert: 1;
+}
+
+/* IX. Blood Angels [LOYAL] */
+[data-legion="blood-angels"] {
+  --legion-primary: #2a0808;
+  --legion-secondary: #d84040;
+  --legion-accent: #6a1818;
+  --legion-glow: rgba(216, 64, 64, 0.2);
+  --legion-text: #f0e0d0;
+  --color-bg: #2a0808;
+  --color-bg-secondary: #240707;
+  --color-bg-tertiary: #3b1c1c;
+  --color-surface: #442626;
+  --color-text: #f0e0d0;
+  --color-text-secondary: rgba(240, 224, 208, 0.7);
+  --color-text-muted: rgba(240, 224, 208, 0.45);
+  --color-border: #4a2d2d;
+  --color-border-light: #593e3e;
+  --color-primary: #d84040;
+  --color-link: #d84040;
+  --color-link-hover: #6a1818;
+  --shadow-glow-gold:
+    0 0 8px rgba(216, 64, 64, 0.2), 0 0 16px rgba(216, 64, 64, 0.1);
+  --link-underline-color: rgba(216, 64, 64, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(216, 64, 64, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(216, 64, 64, 0.5);
+  --era-btn-active-bg: rgba(216, 64, 64, 0.1);
+  --logo-invert: 1;
+}
+
+/* X. Iron Hands [LOYAL] */
+[data-legion="iron-hands"] {
+  --legion-primary: #1a1a1e;
+  --legion-secondary: #8a9aaa;
+  --legion-accent: #506070;
+  --legion-glow: rgba(138, 154, 170, 0.3);
+  --legion-text: #d0d8e0;
+  --color-bg: #1a1a1e;
+  --color-bg-secondary: #16161a;
+  --color-bg-tertiary: #2c2c30;
+  --color-surface: #353539;
+  --color-text: #d0d8e0;
+  --color-text-secondary: rgba(208, 216, 224, 0.7);
+  --color-text-muted: rgba(208, 216, 224, 0.45);
+  --color-border: #3c3c40;
+  --color-border-light: #4c4c50;
+  --color-primary: #8a9aaa;
+  --color-link: #8a9aaa;
+  --color-link-hover: #506070;
+  --shadow-glow-gold:
+    0 0 8px rgba(138, 154, 170, 0.3), 0 0 16px rgba(138, 154, 170, 0.15);
+  --link-underline-color: rgba(138, 154, 170, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(138, 154, 170, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(138, 154, 170, 0.5);
+  --era-btn-active-bg: rgba(138, 154, 170, 0.1);
+  --logo-invert: 1;
+}
+
+/* XII. World Eaters [TRAITOR, Crusade] */
+[data-legion="world-eaters"] {
+  --legion-primary: #e0e0d0;
+  --legion-secondary: #3a5a8a;
+  --legion-accent: #4c5d8e;
+  --legion-glow: rgba(58, 90, 138, 0.2);
+  --legion-text: #1a1a1a;
+  --color-bg: #e0e0d0;
+  --color-bg-secondary: #d5d5c6;
+  --color-bg-tertiary: #eaeadc;
+  --color-surface: #ececde;
+  --color-text: #1a1a1a;
+  --color-text-secondary: rgba(26, 26, 26, 0.6);
+  --color-text-muted: rgba(26, 26, 26, 0.4);
+  --color-border: #c0c0b0;
+  --color-border-light: #c8c8b8;
+  --color-primary: #3a5a8a;
+  --color-link: #3a5a8a;
+  --color-link-hover: #4c5d8e;
+  --shadow-glow-gold:
+    0 0 8px rgba(58, 90, 138, 0.2), 0 0 16px rgba(58, 90, 138, 0.1);
+  --link-underline-color: rgba(58, 90, 138, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(58, 90, 138, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(58, 90, 138, 0.5);
+  --era-btn-active-bg: rgba(58, 90, 138, 0.1);
+  --logo-invert: 0;
+}
+/* XII. World Eaters -- Heresy: Khorne */
+[data-legion="world-eaters"][data-legion-era="heresy"] {
+  --legion-primary: #5a1008;
+  --legion-secondary: #a87830;
+  --legion-accent: #d82818;
+  --legion-glow: rgba(216, 40, 24, 0.3);
+  --legion-text: #d8b898;
+  --color-bg: #5a1008;
+  --color-bg-secondary: #4c0e07;
+  --color-bg-tertiary: #67231c;
+  --color-surface: #6e2d26;
+  --color-text: #d8b898;
+  --color-text-secondary: rgba(216, 184, 152, 0.7);
+  --color-text-muted: rgba(216, 184, 152, 0.45);
+  --color-border: #73342d;
+  --color-border-light: #7e453e;
+  --color-primary: #a87830;
+  --color-link: #a87830;
+  --color-link-hover: #d82818;
+  --shadow-glow-gold:
+    0 0 8px rgba(216, 40, 24, 0.3), 0 0 16px rgba(216, 40, 24, 0.15);
+  --link-underline-color: rgba(168, 120, 48, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(168, 120, 48, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(168, 120, 48, 0.5);
+  --era-btn-active-bg: rgba(168, 120, 48, 0.1);
+  --logo-invert: 1;
+}
+
+/* XIII. Ultramarines [LOYAL] */
+[data-legion="ultramarines"] {
+  --legion-primary: #102e58;
+  --legion-secondary: #e8b828;
+  --legion-accent: #4070c0;
+  --legion-glow: rgba(64, 112, 192, 0.3);
+  --legion-text: #d8e8f8;
+  --color-bg: #102e58;
+  --color-bg-secondary: #0e274b;
+  --color-bg-tertiary: #233f65;
+  --color-surface: #2d476c;
+  --color-text: #d8e8f8;
+  --color-text-secondary: rgba(216, 232, 248, 0.7);
+  --color-text-muted: rgba(216, 232, 248, 0.45);
+  --color-border: #344d71;
+  --color-border-light: #455c7d;
+  --color-primary: #e8b828;
+  --color-link: #e8b828;
+  --color-link-hover: #4070c0;
+  --shadow-glow-gold:
+    0 0 8px rgba(64, 112, 192, 0.3), 0 0 16px rgba(64, 112, 192, 0.15);
+  --link-underline-color: rgba(232, 184, 40, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(232, 184, 40, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(232, 184, 40, 0.5);
+  --era-btn-active-bg: rgba(232, 184, 40, 0.1);
+  --logo-invert: 1;
+}
+
+/* XIV. Death Guard [TRAITOR, Crusade] */
+[data-legion="death-guard"] {
+  --legion-primary: #d0c8a8;
+  --legion-secondary: #4a6838;
+  --legion-accent: #384828;
+  --legion-glow: rgba(74, 104, 56, 0.2);
+  --legion-text: #1a1a10;
+  --color-bg: #d0c8a8;
+  --color-bg-secondary: #b1aa8f;
+  --color-bg-tertiary: #d4ccaf;
+  --color-surface: #d6cfb2;
+  --color-text: #1a1a10;
+  --color-text-secondary: rgba(26, 26, 16, 0.7);
+  --color-text-muted: rgba(26, 26, 16, 0.45);
+  --color-border: #d7d0b5;
+  --color-border-light: #dad4bb;
+  --color-primary: #4a6838;
+  --color-link: #4a6838;
+  --color-link-hover: #384828;
+  --shadow-glow-gold:
+    0 0 8px rgba(74, 104, 56, 0.2), 0 0 16px rgba(74, 104, 56, 0.1);
+  --link-underline-color: rgba(74, 104, 56, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(74, 104, 56, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(74, 104, 56, 0.5);
+  --era-btn-active-bg: rgba(74, 104, 56, 0.1);
+  --logo-invert: 0;
+}
+/* XIV. Death Guard -- Heresy: Nurgle */
+[data-legion="death-guard"][data-legion-era="heresy"] {
+  --legion-primary: #282818;
+  --legion-secondary: #7a8838;
+  --legion-accent: #8a5028;
+  --legion-glow: rgba(122, 136, 56, 0.3);
+  --legion-text: #d0d0b0;
+  --color-bg: #282818;
+  --color-bg-secondary: #222214;
+  --color-bg-tertiary: #39392a;
+  --color-surface: #424234;
+  --color-text: #d0d0b0;
+  --color-text-secondary: rgba(208, 208, 176, 0.7);
+  --color-text-muted: rgba(208, 208, 176, 0.45);
+  --color-border: #48483b;
+  --color-border-light: #57574b;
+  --color-primary: #7a8838;
+  --color-link: #7a8838;
+  --color-link-hover: #8a5028;
+  --shadow-glow-gold:
+    0 0 8px rgba(122, 136, 56, 0.3), 0 0 16px rgba(122, 136, 56, 0.15);
+  --link-underline-color: rgba(122, 136, 56, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(122, 136, 56, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(122, 136, 56, 0.5);
+  --era-btn-active-bg: rgba(122, 136, 56, 0.1);
+  --logo-invert: 1;
+}
+
+/* XV. Thousand Sons [TRAITOR, Crusade] */
+[data-legion="thousand-sons"] {
+  --legion-primary: #3e1028;
+  --legion-secondary: #b88820;
+  --legion-accent: #986830;
+  --legion-glow: rgba(184, 136, 32, 0.3);
+  --legion-text: #d8c0b8;
+  --color-bg: #3e1028;
+  --color-bg-secondary: #350e22;
+  --color-bg-tertiary: #4d2339;
+  --color-surface: #552d42;
+  --color-text: #d8c0b8;
+  --color-text-secondary: rgba(216, 192, 184, 0.7);
+  --color-text-muted: rgba(216, 192, 184, 0.45);
+  --color-border: #5b3448;
+  --color-border-light: #684557;
+  --color-primary: #b88820;
+  --color-link: #b88820;
+  --color-link-hover: #986830;
+  --shadow-glow-gold:
+    0 0 8px rgba(184, 136, 32, 0.3), 0 0 16px rgba(184, 136, 32, 0.15);
+  --link-underline-color: rgba(184, 136, 32, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(184, 136, 32, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(184, 136, 32, 0.5);
+  --era-btn-active-bg: rgba(184, 136, 32, 0.1);
+  --logo-invert: 1;
+}
+/* XV. Thousand Sons -- Heresy: Tzeentch */
+[data-legion="thousand-sons"][data-legion-era="heresy"] {
+  --legion-primary: #1a1040;
+  --legion-secondary: #d8a828;
+  --legion-accent: #6a50b0;
+  --legion-glow: rgba(106, 80, 176, 0.35);
+  --legion-text: #d0c8e0;
+  --color-bg: #1a1040;
+  --color-bg-secondary: #160e36;
+  --color-bg-tertiary: #2c234f;
+  --color-surface: #352d57;
+  --color-text: #d0c8e0;
+  --color-text-secondary: rgba(208, 200, 224, 0.7);
+  --color-text-muted: rgba(208, 200, 224, 0.45);
+  --color-border: #3c345d;
+  --color-border-light: #4c456a;
+  --color-primary: #d8a828;
+  --color-link: #d8a828;
+  --color-link-hover: #6a50b0;
+  --shadow-glow-gold:
+    0 0 8px rgba(106, 80, 176, 0.35), 0 0 16px rgba(106, 80, 176, 0.175);
+  --link-underline-color: rgba(216, 168, 40, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(216, 168, 40, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(216, 168, 40, 0.5);
+  --era-btn-active-bg: rgba(216, 168, 40, 0.1);
+  --logo-invert: 1;
+}
+
+/* XVI. Sons of Horus [TRAITOR, Crusade] */
+[data-legion="sons-of-horus"] {
+  --legion-primary: #1a3a38;
+  --legion-secondary: #5a9a90;
+  --legion-accent: #488880;
+  --legion-glow: rgba(90, 154, 144, 0.3);
+  --legion-text: #d8e8e4;
+  --color-bg: #1a3a38;
+  --color-bg-secondary: #163130;
+  --color-bg-tertiary: #2c4a48;
+  --color-surface: #355250;
+  --color-text: #d8e8e4;
+  --color-text-secondary: rgba(216, 232, 228, 0.7);
+  --color-text-muted: rgba(216, 232, 228, 0.45);
+  --color-border: #3c5856;
+  --color-border-light: #4c6564;
+  --color-primary: #5a9a90;
+  --color-link: #5a9a90;
+  --color-link-hover: #488880;
+  --shadow-glow-gold:
+    0 0 8px rgba(90, 154, 144, 0.3), 0 0 16px rgba(90, 154, 144, 0.15);
+  --link-underline-color: rgba(90, 154, 144, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(90, 154, 144, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(90, 154, 144, 0.5);
+  --era-btn-active-bg: rgba(90, 154, 144, 0.1);
+  --logo-invert: 1;
+}
+/* XVI. Sons of Horus / Black Legion -- Heresy: Chaos Undivided */
+[data-legion="sons-of-horus"][data-legion-era="heresy"] {
+  --legion-primary: #0a0a0a;
+  --legion-secondary: #e8a828;
+  --legion-accent: #b12a2a;
+  --legion-glow: rgba(232, 168, 40, 0.3);
+  --legion-text: #e0d8cc;
+  --color-bg: #0a0a0a;
+  --color-bg-secondary: #080808;
+  --color-bg-tertiary: #1e1e1e;
+  --color-surface: #272727;
+  --color-text: #e0d8cc;
+  --color-text-secondary: rgba(224, 216, 204, 0.7);
+  --color-text-muted: rgba(224, 216, 204, 0.45);
+  --color-border: #2f2f2f;
+  --color-border-light: #404040;
+  --color-primary: #e8a828;
+  --color-link: #e8a828;
+  --color-link-hover: #b12a2a;
+  --shadow-glow-gold:
+    0 0 8px rgba(232, 168, 40, 0.3), 0 0 16px rgba(232, 168, 40, 0.15);
+  --link-underline-color: rgba(232, 168, 40, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(232, 168, 40, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(232, 168, 40, 0.5);
+  --era-btn-active-bg: rgba(232, 168, 40, 0.1);
+  --logo-invert: 1;
+}
+
+/* XVII. Word Bearers [TRAITOR, Crusade] */
+[data-legion="word-bearers"] {
+  --legion-primary: #2e2a28;
+  --legion-secondary: #b0a898;
+  --legion-accent: #706058;
+  --legion-glow: rgba(176, 168, 152, 0.25);
+  --legion-text: #e0d8d0;
+  --color-bg: #2e2a28;
+  --color-bg-secondary: #272422;
+  --color-bg-tertiary: #3f3b39;
+  --color-surface: #474442;
+  --color-text: #e0d8d0;
+  --color-text-secondary: rgba(224, 216, 208, 0.7);
+  --color-text-muted: rgba(224, 216, 208, 0.45);
+  --color-border: #4d4a48;
+  --color-border-light: #5c5957;
+  --color-primary: #b0a898;
+  --color-link: #b0a898;
+  --color-link-hover: #706058;
+  --shadow-glow-gold:
+    0 0 8px rgba(176, 168, 152, 0.25), 0 0 16px rgba(176, 168, 152, 0.125);
+  --link-underline-color: rgba(176, 168, 152, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(176, 168, 152, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(176, 168, 152, 0.5);
+  --era-btn-active-bg: rgba(176, 168, 152, 0.1);
+  --logo-invert: 1;
+}
+/* XVII. Word Bearers -- Heresy: Chaos Undivided */
+[data-legion="word-bearers"][data-legion-era="heresy"] {
+  --legion-primary: #3a1010;
+  --legion-secondary: #bb6053;
+  --legion-accent: #8a8080;
+  --legion-glow: rgba(184, 88, 74, 0.3);
+  --legion-text: #e8dcd0;
+  --color-bg: #3a1010;
+  --color-bg-secondary: #310e0e;
+  --color-bg-tertiary: #4a2323;
+  --color-surface: #522d2d;
+  --color-text: #e8dcd0;
+  --color-text-secondary: rgba(232, 220, 208, 0.7);
+  --color-text-muted: rgba(232, 220, 208, 0.45);
+  --color-border: #583434;
+  --color-border-light: #654545;
+  --color-primary: #bb6053;
+  --color-link: #bb6053;
+  --color-link-hover: #8a8080;
+  --shadow-glow-gold:
+    0 0 8px rgba(184, 88, 74, 0.3), 0 0 16px rgba(184, 88, 74, 0.15);
+  --link-underline-color: rgba(187, 96, 83, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(187, 96, 83, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(187, 96, 83, 0.5);
+  --era-btn-active-bg: rgba(187, 96, 83, 0.1);
+  --logo-invert: 1;
+}
+
+/* XVIII. Salamanders [LOYAL] */
+[data-legion="salamanders"] {
+  --legion-primary: #1a3818;
+  --legion-secondary: #4a8848;
+  --legion-accent: #d08828;
+  --legion-glow: rgba(74, 136, 72, 0.35);
+  --legion-text: #e0e8d0;
+  --color-bg: #1a3818;
+  --color-bg-secondary: #163014;
+  --color-bg-tertiary: #2c482a;
+  --color-surface: #355034;
+  --color-text: #e0e8d0;
+  --color-text-secondary: rgba(224, 232, 208, 0.7);
+  --color-text-muted: rgba(224, 232, 208, 0.45);
+  --color-border: #3c563b;
+  --color-border-light: #4c644b;
+  --color-primary: #4a8848;
+  --color-link: #4a8848;
+  --color-link-hover: #d08828;
+  --shadow-glow-gold:
+    0 0 8px rgba(74, 136, 72, 0.35), 0 0 16px rgba(74, 136, 72, 0.175);
+  --link-underline-color: rgba(74, 136, 72, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(74, 136, 72, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(74, 136, 72, 0.5);
+  --era-btn-active-bg: rgba(74, 136, 72, 0.1);
+  --logo-invert: 1;
+}
+
+/* XIX. Raven Guard [LOYAL] */
+[data-legion="raven-guard"] {
+  --legion-primary: #0a0a0a;
+  --legion-secondary: #d8d0c0;
+  --legion-accent: #a09880;
+  --legion-glow: rgba(216, 208, 192, 0.2);
+  --legion-text: #d8d0c0;
+  --color-bg: #0a0a0a;
+  --color-bg-secondary: #080808;
+  --color-bg-tertiary: #1e1e1e;
+  --color-surface: #272727;
+  --color-text: #d8d0c0;
+  --color-text-secondary: rgba(216, 208, 192, 0.7);
+  --color-text-muted: rgba(216, 208, 192, 0.45);
+  --color-border: #2f2f2f;
+  --color-border-light: #404040;
+  --color-primary: #d8d0c0;
+  --color-link: #d8d0c0;
+  --color-link-hover: #a09880;
+  --shadow-glow-gold:
+    0 0 8px rgba(216, 208, 192, 0.2), 0 0 16px rgba(216, 208, 192, 0.1);
+  --link-underline-color: rgba(216, 208, 192, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(216, 208, 192, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(216, 208, 192, 0.5);
+  --era-btn-active-bg: rgba(216, 208, 192, 0.1);
+  --logo-invert: 1;
+}
+
+/* XX. Alpha Legion [TRAITOR, Crusade] */
+[data-legion="alpha-legion"] {
+  --legion-primary: #0e3040;
+  --legion-secondary: #48b0a8;
+  --legion-accent: #3890a0;
+  --legion-glow: rgba(72, 176, 168, 0.35);
+  --legion-text: #c8ecf0;
+  --color-bg: #0e3040;
+  --color-bg-secondary: #0c2936;
+  --color-bg-tertiary: #21414f;
+  --color-surface: #2b4957;
+  --color-text: #c8ecf0;
+  --color-text-secondary: rgba(200, 236, 240, 0.7);
+  --color-text-muted: rgba(200, 236, 240, 0.45);
+  --color-border: #324f5d;
+  --color-border-light: #435e6a;
+  --color-primary: #48b0a8;
+  --color-link: #48b0a8;
+  --color-link-hover: #3890a0;
+  --shadow-glow-gold:
+    0 0 8px rgba(72, 176, 168, 0.35), 0 0 16px rgba(72, 176, 168, 0.175);
+  --link-underline-color: rgba(72, 176, 168, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(72, 176, 168, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(72, 176, 168, 0.5);
+  --era-btn-active-bg: rgba(72, 176, 168, 0.1);
+  --logo-invert: 1;
+}
+/* XX. Alpha Legion -- Heresy */
+[data-legion="alpha-legion"][data-legion-era="heresy"] {
+  --legion-primary: #0a2838;
+  --legion-secondary: #40a098;
+  --legion-accent: #308088;
+  --legion-glow: rgba(64, 160, 152, 0.3);
+  --legion-text: #c0e4e8;
+  --color-bg: #0a2838;
+  --color-bg-secondary: #082230;
+  --color-bg-tertiary: #1e3948;
+  --color-surface: #274250;
+  --color-text: #c0e4e8;
+  --color-text-secondary: rgba(192, 228, 232, 0.7);
+  --color-text-muted: rgba(192, 228, 232, 0.45);
+  --color-border: #2f4856;
+  --color-border-light: #405764;
+  --color-primary: #40a098;
+  --color-link: #40a098;
+  --color-link-hover: #308088;
+  --shadow-glow-gold:
+    0 0 8px rgba(64, 160, 152, 0.3), 0 0 16px rgba(64, 160, 152, 0.15);
+  --link-underline-color: rgba(64, 160, 152, 0.3);
+  --shadow-text-glow: 0 0 8px rgba(64, 160, 152, 0.4);
+  --shadow-text-glow-lg: 0 0 12px rgba(64, 160, 152, 0.5);
+  --era-btn-active-bg: rgba(64, 160, 152, 0.1);
+  --logo-invert: 1;
+}

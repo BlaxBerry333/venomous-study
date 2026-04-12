@@ -1,0 +1,53 @@
+{
+  "name": "venomous-study",
+  "type": "module",
+  "version": "0.0.1",
+  "author": "Blaxberry",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "lint": "eslint ..",
+    "lint:fix": "eslint --fix ..",
+    "format": "prettier --write \"../docs/**\" \"src/**\"",
+    "format:check": "prettier --check \"../docs/**\" \"src/**\"",
+    "spellcheck": "cspell --root .. \"app/src/**\" \"docs/**\"",
+    "prepare": "cd .. && husky"
+  },
+  "lint-staged": {
+    "app/src/**/*.{js,ts,mjs,astro}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "app/src/**/*.css": [
+      "prettier --write"
+    ],
+    "docs/**/*.{md,mdx}": [
+      "prettier --write",
+      "cspell --no-must-find-files"
+    ],
+    "app/src/**/*.{ts,astro}": [
+      "cspell --no-must-find-files"
+    ]
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^5.0.3",
+    "astro": "^6.1.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "cspell": "^9.8.0",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^1.7.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.2",
+    "prettier-plugin-astro": "^0.14.1",
+    "typescript-eslint": "^8.58.1"
+  }
+}
