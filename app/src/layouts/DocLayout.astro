@@ -10,9 +10,11 @@ interface Props {
   description?: string;
   isDocPage?: boolean;
   locale?: Locale;
+  /** Forwarded to BaseLayout for canonical `<link>` + OG URL. */
+  canonicalPath?: string;
 }
 
-const { title, description, isDocPage = false } = Astro.props;
+const { title, description, isDocPage = false, canonicalPath } = Astro.props;
 const locale = Astro.props.locale ?? getLocaleFromUrl(Astro.url);
 const currentPath = Astro.url.pathname;
 const base = import.meta.env.BASE_URL;
@@ -22,7 +24,12 @@ const labelOpen = t("nav.openMenu", locale);
 const labelClose = t("nav.closeMenu", locale);
 ---
 
-<BaseLayout title={title} description={description} locale={locale}>
+<BaseLayout
+  title={title}
+  description={description}
+  locale={locale}
+  canonicalPath={canonicalPath}
+>
   <HamburgerButton labelOpen={labelOpen} labelClose={labelClose} />
   <div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
   <Sidebar currentPath={currentPath} locale={locale} />

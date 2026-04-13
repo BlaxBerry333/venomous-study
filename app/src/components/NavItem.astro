@@ -1,23 +1,58 @@
 ---
-import type { NavNode } from "@utils/collections";
+import { MAX_NAV_DEPTH, toNavPath, type NavNode } from "@utils/collections";
 // Self-import aliased to enable arbitrary-depth recursive rendering
 // without colliding with the filename-derived component identifier.
 import Self from "@components/NavItem.astro";
 
 interface Props {
   items: NavNode[];
+  /** Raw `Astro.url.pathname` of the current request (kept for parity/logging). */
   currentPath: string;
+  /**
+   * Pre-normalized current nav path (`toNavPath(currentPath, base, localePrefix)`).
+   * Computed once in `Sidebar.astro` and threaded through every recursive
+   * `<Self />` call unchanged so `isActive` does not have to re-normalize
+   * the current path on every comparison.
+   */
+  currentNavPath?: string;
+  /** Site base URL (e.g. `/venomous-study/`) — used to normalize `href` sides. */
+  base?: string;
+  /** Locale prefix (`""` for zh, `"ja/"` for ja) — used to normalize `href` sides. */
+  localePrefix?: string;
+  /**
+   * The L3 ancestor path of the current page in NavNode.path coordinates,
+   * or `null` when no L3 should expand (homepage / L1 / L2 index).
+   * Computed once in `Sidebar.astro` and threaded through every recursive
+   * `<Self />` call unchanged.
+   */
+  currentL3Path?: string | null;
   ariaLabel?: string;
   depth?: number;
 }
 
-const { items, currentPath, ariaLabel, depth = 0 } = Astro.props;
+const {
+  items,
+  currentPath,
+  currentNavPath = "",
+  base = "",
+  localePrefix = "",
+  currentL3Path = null,
+  ariaLabel,
+  depth = 0,
+} = Astro.props;
 
-function isActive(href: string | undefined, current: string): boolean {
+/**
+ * Active when both sides normalize to the same canonical nav path. Accepts
+ * the sidebar's canonical href (`/foo`) AND the backward-compat `/foo/index`
+ * URL — `toNavPath` strips trailing `/index` + base + locale on both sides.
+ * Empty strings never match so the homepage does not light up every L1 link.
+ */
+function isActive(href: string | undefined): boolean {
   if (!href) return false;
-  const normalizedHref = href.replace(/\/$/, "");
-  const normalizedCurrent = current.replace(/\/$/, "");
-  return normalizedHref === normalizedCurrent;
+  if (!currentNavPath) return false;
+  const hrefNavPath = toNavPath(href, base, localePrefix);
+  if (!hrefNavPath) return false;
+  return hrefNavPath === currentNavPath;
 }
 
 const isRoot = depth === 0;
@@ -25,10 +60,27 @@ const listClass = isRoot
   ? "sidebar-list"
   : `nav-children${depth > 1 ? " nav-children--nested" : ""}`;
 const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
+
+// Hard guard: never recurse past MAX_NAV_DEPTH layers. The data layer
+// (`getNavTree` L5+ truncation) already enforces this, but keep the view
+// guard as defense in depth. NOTE: `depth` is 0-based (depth 0 = L1 row),
+// while `MAX_NAV_DEPTH` counts layers — the equivalence is `depth >= 4`.
+const exceedsMaxDepth = depth >= MAX_NAV_DEPTH;
+
+// When rendering the L4 children list (i.e. depth+1 === 3, the depth at
+// which the upcoming <Self /> would render L4 leaves), filter out any
+// residual `index` segment leaves. The `getNavTree` hoist should already
+// have removed them; this is defensive — a future refactor breaking hoist
+// won't ship a stray "Index" entry to users.
+function visibleChildren(node: NavNode, nextDepth: number): NavNode[] {
+  const raw = node.children ?? [];
+  if (nextDepth === 3) return raw.filter((c) => c.segment !== "index");
+  return raw;
+}
 ---
 
 {
-  isRoot ? (
+  exceedsMaxDepth ? null : isRoot ? (
     <nav class="sidebar-nav" aria-label={ariaLabel ?? "Documentation"}>
       <ul class={listClass}>
         {items.map((item) => (
@@ -38,8 +90,12 @@ const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
                 <span class="nav-group-label">{item.label}</span>
                 {item.children && item.children.length > 0 && (
                   <Self
-                    items={item.children}
+                    items={visibleChildren(item, 1)}
                     currentPath={currentPath}
+                    currentNavPath={currentNavPath}
+                    base={base}
+                    localePrefix={localePrefix}
+                    currentL3Path={currentL3Path}
                     depth={1}
                   />
                 )}
@@ -48,9 +104,9 @@ const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
               <>
                 {item.href ? (
                   <a
-                    class={`nav-link nav-dir-link${isActive(item.href, currentPath) ? " active" : ""}`}
+                    class={`nav-link nav-dir-link${isActive(item.href) ? " active" : ""}`}
                     href={item.href}
-                    {...(isActive(item.href, currentPath)
+                    {...(isActive(item.href)
                       ? { "aria-current": "page" as const }
                       : {})}
                   >
@@ -63,17 +119,21 @@ const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
                 )}
                 {item.children && item.children.length > 0 && (
                   <Self
-                    items={item.children}
+                    items={visibleChildren(item, depth + 1)}
                     currentPath={currentPath}
+                    currentNavPath={currentNavPath}
+                    base={base}
+                    localePrefix={localePrefix}
+                    currentL3Path={currentL3Path}
                     depth={depth + 1}
                   />
                 )}
               </>
             ) : (
               <a
-                class={`nav-link${isActive(item.href, currentPath) ? " active" : ""}`}
+                class={`nav-link${isActive(item.href) ? " active" : ""}`}
                 href={item.href}
-                {...(isActive(item.href, currentPath)
+                {...(isActive(item.href)
                   ? { "aria-current": "page" as const }
                   : {})}
               >
@@ -86,46 +146,63 @@ const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
     </nav>
   ) : (
     <ul class={listClass} style={listStyle}>
-      {items.map((item) => (
-        <li class="nav-item">
-          {item.isDirectory ? (
-            <>
-              {item.href ? (
-                <a
-                  class={`nav-link nav-dir-link${isActive(item.href, currentPath) ? " active" : ""}`}
-                  href={item.href}
-                  {...(isActive(item.href, currentPath)
-                    ? { "aria-current": "page" as const }
-                    : {})}
-                >
-                  {item.label}
-                </a>
-              ) : (
-                <span class="nav-link nav-dir-link" aria-disabled="true">
-                  {item.label}
-                </span>
-              )}
-              {item.children && item.children.length > 0 && (
-                <Self
-                  items={item.children}
-                  currentPath={currentPath}
-                  depth={depth + 1}
-                />
-              )}
-            </>
-          ) : (
-            <a
-              class={`nav-link${isActive(item.href, currentPath) ? " active" : ""}`}
-              href={item.href}
-              {...(isActive(item.href, currentPath)
-                ? { "aria-current": "page" as const }
-                : {})}
-            >
-              {item.label}
-            </a>
-          )}
-        </li>
-      ))}
+      {items.map((item) => {
+        // Contextual expansion gate: at depth === 2 (L3 directory rows),
+        // only render the L4 child <ul> when this L3 sits on the current
+        // page's L3 path. Other depths (L2 → L3) always expand.
+        const isL3Dir = item.isDirectory && depth === 2;
+        const shouldExpandChildren = isL3Dir
+          ? currentL3Path != null && item.path === currentL3Path
+          : true;
+        const nextDepth = depth + 1;
+        const kids = visibleChildren(item, nextDepth);
+        const showSubtree =
+          shouldExpandChildren && kids.length > 0 && nextDepth < MAX_NAV_DEPTH;
+        return (
+          <li class="nav-item">
+            {item.isDirectory ? (
+              <>
+                {item.href ? (
+                  <a
+                    class={`nav-link nav-dir-link${isActive(item.href) ? " active" : ""}`}
+                    href={item.href}
+                    {...(isActive(item.href)
+                      ? { "aria-current": "page" as const }
+                      : {})}
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <span class="nav-link nav-dir-link" aria-disabled="true">
+                    {item.label}
+                  </span>
+                )}
+                {showSubtree && (
+                  <Self
+                    items={kids}
+                    currentPath={currentPath}
+                    currentNavPath={currentNavPath}
+                    base={base}
+                    localePrefix={localePrefix}
+                    currentL3Path={currentL3Path}
+                    depth={nextDepth}
+                  />
+                )}
+              </>
+            ) : (
+              <a
+                class={`nav-link${isActive(item.href) ? " active" : ""}`}
+                href={item.href}
+                {...(isActive(item.href)
+                  ? { "aria-current": "page" as const }
+                  : {})}
+              >
+                {item.label}
+              </a>
+            )}
+          </li>
+        );
+      })}
     </ul>
   )
 }
@@ -144,10 +221,18 @@ const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
     display: flex;
     flex-direction: column;
   }
+  /* Link padding-left encodes depth so hover/active backgrounds still fill
+     the full sidebar width (from the container's left edge), while the text
+     itself indents progressively. See design §6.1. --nav-depth is injected
+     via inline style on the ancestor <ul>; depth 0 (L1 group label) falls
+     back to `0` so the base `--space-3` applies. */
   .nav-link {
     display: flex;
     align-items: center;
-    padding: var(--space-2) var(--space-3);
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+    padding-right: var(--space-3);
+    padding-left: calc(var(--space-3) + var(--nav-depth, 0) * var(--space-3));
     border-radius: var(--radius-sm);
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
@@ -193,9 +278,10 @@ const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
     flex-direction: column;
     gap: var(--space-1);
   }
-  /* Deeper levels get progressive indent driven by --nav-depth. Each additional
-     depth adds one unit of --space-3 left padding on the link itself. */
+  /* Nested children list no longer owns the indent; the inline style
+     `--nav-depth: N` is consumed by `.nav-link` padding-left instead so
+     hover/active backgrounds can fill from the sidebar's left edge. */
   .nav-children--nested {
-    padding-left: calc((var(--nav-depth, 1) - 1) * var(--space-3));
+    padding-left: 0;
   }
 </style>

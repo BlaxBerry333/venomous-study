@@ -2,7 +2,7 @@
 import LegionSelector from "@components/LegionSelector.astro";
 import LanguageSwitcher from "@components/LanguageSwitcher.astro";
 import NavItem from "@components/NavItem.astro";
-import { getNavTree } from "@utils/collections";
+import { getNavTree, toNavPath, getCurrentL3Path } from "@utils/collections";
 import { t, type Locale } from "@i18n/index";
 
 interface Props {
@@ -13,16 +13,24 @@ interface Props {
 const { currentPath, locale } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const localePrefix = locale === "zh" ? "" : "ja/";
-const sidebarPersistName = `sidebar-${locale}`;
 
 const navItems = await getNavTree(locale);
+// Pre-normalize the current path once: NavItem compares href (canonical)
+// against this canonical nav path on every render. Computing here avoids
+// O(n) re-normalization across the recursive tree.
+const currentNavPath = toNavPath(currentPath, base, localePrefix);
+// Derive the L3 ancestor of the current page in NavNode.path coordinates.
+// `null` means "no L3 should expand" (homepage / L1 / L2 index). NavItem
+// consumes this to decide whether to render L4 children for a given L3
+// directory node. Threshold is `< 3` so L3 index pages also expand — see
+// design §3.2 / decision B.
+const currentL3Path = getCurrentL3Path(currentNavPath);
 ---
 
 <aside
   class="doc-sidebar corner-decoration"
   id="sidebar"
   aria-label={t("sidebar.ariaLabel", locale)}
-  transition:persist={sidebarPersistName}
 >
   <div class="sidebar-inner scroll-touch">
     <a class="sidebar-home" href={`${base}${localePrefix}`}>
@@ -33,27 +41,14 @@ const navItems = await getNavTree(locale);
     <NavItem
       items={navItems}
       currentPath={currentPath}
+      currentNavPath={currentNavPath}
+      base={base}
+      localePrefix={localePrefix}
+      currentL3Path={currentL3Path}
       ariaLabel={t("sidebar.docsAriaLabel", locale)}
     />
   </div>
 </aside>
-
-<script>
-  // Update active nav-link after page navigation (sidebar is persisted across routes)
-  document.addEventListener("astro:after-swap", () => {
-    const currentPath = window.location.pathname.replace(/\/$/, "");
-    document.querySelectorAll(".sidebar-nav .nav-link").forEach((link) => {
-      const href = link.getAttribute("href")?.replace(/\/$/, "");
-      if (href === currentPath) {
-        link.classList.add("active");
-        link.setAttribute("aria-current", "page");
-      } else {
-        link.classList.remove("active");
-        link.removeAttribute("aria-current");
-      }
-    });
-  });
-</script>
 
 <style>
   /* SB1-SB6, SH1-SH2: Matches mockup.html L162-210 exactly */

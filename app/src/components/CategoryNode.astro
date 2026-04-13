@@ -1,5 +1,5 @@
 ---
-import type { NavNode } from "@utils/collections";
+import { MAX_NAV_DEPTH, type NavNode } from "@utils/collections";
 // Self-import aliased to enable arbitrary-depth recursive rendering.
 import Self from "@components/CategoryNode.astro";
 
@@ -8,6 +8,13 @@ interface Props {
 }
 
 const { node } = Astro.props;
+
+// Depth derived from the slug path itself (L2=2 segments, L3=3, L4=4).
+// Homepage truncates the category grid at L3 — L3 directory nodes render
+// their label/href but do NOT expand their L4 children. (The sidebar still
+// shows L4 contextually; that rule lives in NavItem.astro.)
+const depthByPath = node.path.split("/").filter((s) => s.length > 0).length;
+const renderChildren = depthByPath < 3 && depthByPath < MAX_NAV_DEPTH;
 ---
 
 {
@@ -20,7 +27,7 @@ const { node } = Astro.props;
       ) : (
         <span class="sub-category">{node.label}</span>
       )}
-      {node.children && node.children.length > 0 && (
+      {renderChildren && node.children && node.children.length > 0 && (
         <ul class="sub-doc-list">
           {node.children.map((child) => (
             <Self node={child} />

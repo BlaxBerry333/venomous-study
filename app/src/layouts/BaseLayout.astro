@@ -13,15 +13,29 @@ interface Props {
   title?: string;
   description?: string;
   locale?: Locale;
+  /**
+   * Optional explicit canonical path (including base + locale prefix, with
+   * trailing slash — e.g. `/venomous-study/foo/`). When provided, overrides
+   * `Astro.url.pathname` for the canonical link / OG URL so backward-compat
+   * routes like `/foo/index/` still point the canonical tag at `/foo/`.
+   * Non-doc pages (homepage, 404) leave this undefined and fall back to
+   * `Astro.url.pathname`.
+   */
+  canonicalPath?: string;
 }
 
 const locale = Astro.props.locale ?? getLocaleFromUrl(Astro.url);
 const htmlLang = localeToHtmlLang[locale];
 const siteName = t("site.name", locale);
 const localizedSiteDescription = t("site.description", locale);
-const { title, description = localizedSiteDescription } = Astro.props;
+const {
+  title,
+  description = localizedSiteDescription,
+  canonicalPath,
+} = Astro.props;
 const pageTitle = title ? `${title} | ${siteName}` : siteName;
-const canonicalURL = new URL(Astro.url.pathname, Astro.site).href;
+const canonicalURL = new URL(canonicalPath ?? Astro.url.pathname, Astro.site)
+  .href;
 const skipToContentLabel = t("nav.skipToContent", locale);
 
 import "@styles/index.css";

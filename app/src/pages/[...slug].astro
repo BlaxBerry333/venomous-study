@@ -1,17 +1,48 @@
 ---
 import DocPage from "@components/DocPage.astro";
-import { getCollection } from "astro:content";
+import { getCollection, type CollectionEntry } from "astro:content";
 import { parseDocId } from "@i18n/index";
+import { canonicalizeSlug } from "@utils/collections";
 
 export async function getStaticPaths() {
   const docs = await getCollection("docs");
-  return docs
+  const published = docs
     .filter((doc) => !doc.data.draft)
-    .filter((doc) => parseDocId(doc.id).locale === "zh")
-    .map((doc) => ({
-      params: { slug: parseDocId(doc.id).slug },
-      props: { doc },
-    }));
+    .filter((doc) => parseDocId(doc.id).locale === "zh");
+
+  const paths: Array<{
+    params: { slug: string };
+    props: { doc: CollectionEntry<"docs"> };
+  }> = [];
+  // Tracks every slug (native + canonical) already emitted, keyed per page
+  // so canonical additions cannot collide with another doc's native slug.
+  const seen = new Map<string, string>();
+
+  for (const doc of published) {
+    const { slug } = parseDocId(doc.id);
+    paths.push({ params: { slug }, props: { doc } });
+    seen.set(slug, doc.id);
+  }
+
+  // Second pass: add canonical routes (strip trailing `/index`). If the
+  // canonical slug collides with another doc's native slug, warn and skip.
+  for (const doc of published) {
+    const { slug } = parseDocId(doc.id);
+    const canonical = canonicalizeSlug(slug);
+    if (canonical === slug) continue;
+    const conflict = seen.get(canonical);
+    if (conflict && conflict !== doc.id) {
+      console.warn(
+        `[zh routes] canonical route "${canonical}" (from "${slug}") ` +
+          `collides with existing doc "${conflict}"; skipping canonical route.`,
+      );
+      continue;
+    }
+    paths.push({ params: { slug: canonical }, props: { doc } });
+    seen.set(canonical, doc.id);
+  }
+
+  return paths;
 }
 
 const { doc } = Astro.props;

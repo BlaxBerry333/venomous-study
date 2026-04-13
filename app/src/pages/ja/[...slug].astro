@@ -2,6 +2,13 @@
 import DocPage from "@components/DocPage.astro";
 import { getCollection, type CollectionEntry } from "astro:content";
 import { parseDocId } from "@i18n/index";
+import { canonicalizeSlug } from "@utils/collections";
+
+type JaPathProps = {
+  doc: CollectionEntry<"docs">;
+  isFallback: boolean;
+  zhSlug?: string;
+};
 
 export async function getStaticPaths() {
   const allDocs = await getCollection("docs");
@@ -21,28 +28,47 @@ export async function getStaticPaths() {
 
   const paths: Array<{
     params: { slug: string };
-    props: {
-      doc: CollectionEntry<"docs">;
-      isFallback: boolean;
-      zhSlug?: string;
-    };
+    props: JaPathProps;
   }> = [];
   const covered = new Set<string>();
+  // Per-page seen set for canonical collision detection (independent from zh).
+  const seen = new Map<string, string>();
+
+  function push(slug: string, props: JaPathProps, sourceId: string): void {
+    paths.push({ params: { slug }, props });
+    seen.set(slug, sourceId);
+  }
+
+  function maybeAddCanonical(
+    slug: string,
+    props: JaPathProps,
+    sourceId: string,
+  ): void {
+    const canonical = canonicalizeSlug(slug);
+    if (canonical === slug) return;
+    const conflict = seen.get(canonical);
+    if (conflict && conflict !== sourceId) {
+      console.warn(
+        `[ja routes] canonical route "${canonical}" (from "${slug}") ` +
+          `collides with existing doc "${conflict}"; skipping canonical route.`,
+      );
+      return;
+    }
+    paths.push({ params: { slug: canonical }, props });
+    seen.set(canonical, sourceId);
+  }
 
   // 1) For every zh doc, produce either the ja translation or a fallback entry.
   for (const zhDoc of zhDocs) {
     const { slug } = parseDocId(zhDoc.id);
     const jaDoc = jaBySlug.get(slug);
     if (jaDoc) {
-      paths.push({
-        params: { slug },
-        props: { doc: jaDoc, isFallback: false },
-      });
+      push(slug, { doc: jaDoc, isFallback: false }, jaDoc.id);
     } else {
-      paths.push({
-        params: { slug },
-        props: { doc: zhDoc, isFallback: true, zhSlug: slug },
-      });
+      // zhSlug retains the ORIGINAL slug (including any trailing `/index`) so
+      // TranslationMissing can still navigate the user to the zh counterpart
+      // — TranslationMissing itself canonicalizes when building its href.
+      push(slug, { doc: zhDoc, isFallback: true, zhSlug: slug }, zhDoc.id);
     }
     covered.add(slug);
   }
@@ -55,11 +81,17 @@ export async function getStaticPaths() {
       console.warn(
         `[i18n] orphan .ja.md without .md counterpart: "${slug}". ja route will be generated, but zh route is missing.`,
       );
-      paths.push({
-        params: { slug },
-        props: { doc: jaDoc, isFallback: false },
-      });
+      push(slug, { doc: jaDoc, isFallback: false }, jaDoc.id);
     }
+  }
+
+  // 3) Canonical pass: add /foo route for any /foo/index native route
+  //    (covers translation, fallback, and orphan branches uniformly).
+  //    Iterate a snapshot of current paths to avoid mutating during traversal.
+  const snapshot = paths.slice();
+  for (const p of snapshot) {
+    const sourceId = p.props.doc.id;
+    maybeAddCanonical(p.params.slug, p.props, sourceId);
   }
 
   return paths;

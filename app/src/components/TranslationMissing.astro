@@ -1,5 +1,6 @@
 ---
 import { t, type Locale } from "@i18n/index";
+import { canonicalizeSlug } from "@utils/collections";
 
 interface Props {
   locale: Locale;
@@ -8,7 +9,8 @@ interface Props {
 
 const { locale, zhSlug } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const zhHref = `${base}${zhSlug}`;
+// Point the user at the canonical zh URL (`/foo` not `/foo/index`).
+const zhHref = `${base}${canonicalizeSlug(zhSlug)}`;
 const homeHref = `${base}ja/`;
 ---
 

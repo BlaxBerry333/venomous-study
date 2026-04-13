@@ -4,7 +4,7 @@ import Breadcrumb from "@components/Breadcrumb.astro";
 import TableOfContents from "@components/TableOfContents.astro";
 import TranslationMissing from "@components/TranslationMissing.astro";
 import { render, type CollectionEntry } from "astro:content";
-import { buildBreadcrumbs } from "@utils/collections";
+import { buildBreadcrumbs, canonicalizeSlug } from "@utils/collections";
 import { parseDocId, type Locale } from "@i18n/index";
 
 interface Props {
@@ -24,6 +24,15 @@ const Content = rendered?.Content;
 const headings = rendered?.headings ?? [];
 
 const crumbs = buildBreadcrumbs(slug, base, locale);
+
+// Compute canonical path so backward-compat `/foo/index/` routes advertise
+// `/foo/` as their SEO canonical. Trailing slash matches Astro SSG output
+// (`foo/index.html` served at `/foo/`).
+const localePrefix = locale === "zh" ? "" : "ja/";
+const canonicalSlug = canonicalizeSlug(slug);
+const canonicalPath = canonicalSlug
+  ? `${base}${localePrefix}${canonicalSlug}/`
+  : `${base}${localePrefix}`;
 ---
 
 <DocLayout
@@ -31,6 +40,7 @@ const crumbs = buildBreadcrumbs(slug, base, locale);
   description={doc.data.description}
   isDocPage
   locale={locale}
+  canonicalPath={canonicalPath}
 >
   <Breadcrumb crumbs={crumbs} />
   {
