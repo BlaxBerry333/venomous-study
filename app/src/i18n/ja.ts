@@ -54,7 +54,7 @@ export const ja: Dictionary = {
   },
   categories: {
     frontend: "Webフロントエンド",
-    backend: "Webバックエンド",
+    "web-backend": "Webバックエンド",
     uncategorized: "未分類",
   },
 };

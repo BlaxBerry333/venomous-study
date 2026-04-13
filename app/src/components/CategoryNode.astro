@@ -1,0 +1,36 @@
+---
+import type { NavNode } from "@utils/collections";
+// Self-import aliased to enable arbitrary-depth recursive rendering.
+import Self from "@components/CategoryNode.astro";
+
+interface Props {
+  node: NavNode;
+}
+
+const { node } = Astro.props;
+---
+
+{
+  node.isDirectory ? (
+    <li>
+      {node.href ? (
+        <a class="sub-category sub-category-link" href={node.href}>
+          {node.label}
+        </a>
+      ) : (
+        <span class="sub-category">{node.label}</span>
+      )}
+      {node.children && node.children.length > 0 && (
+        <ul class="sub-doc-list">
+          {node.children.map((child) => (
+            <Self node={child} />
+          ))}
+        </ul>
+      )}
+    </li>
+  ) : (
+    <li>
+      <a href={node.href}>{node.label}</a>
+    </li>
+  )
+}

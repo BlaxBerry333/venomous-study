@@ -1,23 +1,13 @@
 ---
 import DocLayout from "@layouts/DocLayout.astro";
-import { getDocsByCategory } from "@utils/collections";
-import { parseDocId, t, type Locale } from "@i18n/index";
+import CategoryNode from "@components/CategoryNode.astro";
+import { getNavTree } from "@utils/collections";
+import { t, type Locale } from "@i18n/index";
 
 const locale: Locale = "zh";
-const categories = await getDocsByCategory(locale);
-const base = import.meta.env.BASE_URL;
-const localePrefix = locale === "zh" ? "" : "ja/";
+const navTree = await getNavTree(locale);
 const siteName = t("site.name", locale);
 const heroDescription = t("site.description", locale);
-
-function translateCategory(name: string): string {
-  const key = `categories.${name}`;
-  const translated = t(key, locale);
-  if (translated === key) {
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  }
-  return translated;
-}
 ---
 
 <DocLayout locale={locale}>
@@ -30,38 +20,14 @@ function translateCategory(name: string): string {
 
       <div class="category-grid">
         {
-          categories.map((category) => (
+          navTree.map((category) => (
             <section class="category-card">
               <span class="category-card-corner-tr" />
               <span class="category-card-corner-bl" />
-              <h2>{translateCategory(category.name)}</h2>
+              <h2>{category.label}</h2>
               <ul>
-                {category.subCategories
-                  ? category.subCategories.map((sub) => (
-                      <li>
-                        <span class="sub-category">{sub.name}</span>
-                        <ul class="sub-doc-list">
-                          {sub.docs.map((doc) => (
-                            <li>
-                              <a
-                                href={`${base}${localePrefix}${parseDocId(doc.id).slug}`}
-                              >
-                                {doc.data.title}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
-                    ))
-                  : null}
-                {category.docs.map((doc) => (
-                  <li>
-                    <a
-                      href={`${base}${localePrefix}${parseDocId(doc.id).slug}`}
-                    >
-                      {doc.data.title}
-                    </a>
-                  </li>
+                {(category.children ?? []).map((child) => (
+                  <CategoryNode node={child} />
                 ))}
               </ul>
             </section>

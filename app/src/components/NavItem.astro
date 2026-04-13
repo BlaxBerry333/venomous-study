@@ -1,18 +1,17 @@
 ---
-interface NavEntry {
-  label: string;
-  href?: string;
-  children?: NavEntry[];
-  isGroup?: boolean;
-}
+import type { NavNode } from "@utils/collections";
+// Self-import aliased to enable arbitrary-depth recursive rendering
+// without colliding with the filename-derived component identifier.
+import Self from "@components/NavItem.astro";
 
 interface Props {
-  items: NavEntry[];
+  items: NavNode[];
   currentPath: string;
   ariaLabel?: string;
+  depth?: number;
 }
 
-const { items, currentPath, ariaLabel = "Documentation" } = Astro.props;
+const { items, currentPath, ariaLabel, depth = 0 } = Astro.props;
 
 function isActive(href: string | undefined, current: string): boolean {
   if (!href) return false;
@@ -20,32 +19,98 @@ function isActive(href: string | undefined, current: string): boolean {
   const normalizedCurrent = current.replace(/\/$/, "");
   return normalizedHref === normalizedCurrent;
 }
+
+const isRoot = depth === 0;
+const listClass = isRoot
+  ? "sidebar-list"
+  : `nav-children${depth > 1 ? " nav-children--nested" : ""}`;
+const listStyle = isRoot ? undefined : `--nav-depth: ${depth};`;
 ---
 
-<nav class="sidebar-nav" aria-label={ariaLabel}>
-  <ul class="sidebar-list">
-    {
-      items.map((item) => (
+{
+  isRoot ? (
+    <nav class="sidebar-nav" aria-label={ariaLabel ?? "Documentation"}>
+      <ul class={listClass}>
+        {items.map((item) => (
+          <li class="nav-item">
+            {item.isDirectory && depth === 0 ? (
+              <>
+                <span class="nav-group-label">{item.label}</span>
+                {item.children && item.children.length > 0 && (
+                  <Self
+                    items={item.children}
+                    currentPath={currentPath}
+                    depth={1}
+                  />
+                )}
+              </>
+            ) : item.isDirectory ? (
+              <>
+                {item.href ? (
+                  <a
+                    class={`nav-link nav-dir-link${isActive(item.href, currentPath) ? " active" : ""}`}
+                    href={item.href}
+                    {...(isActive(item.href, currentPath)
+                      ? { "aria-current": "page" as const }
+                      : {})}
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <span class="nav-link nav-dir-link" aria-disabled="true">
+                    {item.label}
+                  </span>
+                )}
+                {item.children && item.children.length > 0 && (
+                  <Self
+                    items={item.children}
+                    currentPath={currentPath}
+                    depth={depth + 1}
+                  />
+                )}
+              </>
+            ) : (
+              <a
+                class={`nav-link${isActive(item.href, currentPath) ? " active" : ""}`}
+                href={item.href}
+                {...(isActive(item.href, currentPath)
+                  ? { "aria-current": "page" as const }
+                  : {})}
+              >
+                {item.label}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </nav>
+  ) : (
+    <ul class={listClass} style={listStyle}>
+      {items.map((item) => (
         <li class="nav-item">
-          {item.isGroup ? (
+          {item.isDirectory ? (
             <>
-              <span class="nav-group-label">{item.label}</span>
+              {item.href ? (
+                <a
+                  class={`nav-link nav-dir-link${isActive(item.href, currentPath) ? " active" : ""}`}
+                  href={item.href}
+                  {...(isActive(item.href, currentPath)
+                    ? { "aria-current": "page" as const }
+                    : {})}
+                >
+                  {item.label}
+                </a>
+              ) : (
+                <span class="nav-link nav-dir-link" aria-disabled="true">
+                  {item.label}
+                </span>
+              )}
               {item.children && item.children.length > 0 && (
-                <ul class="nav-children">
-                  {item.children.map((child) => (
-                    <li class="nav-item">
-                      <a
-                        class={`nav-link${isActive(child.href, currentPath) ? " active" : ""}`}
-                        href={child.href}
-                        {...(isActive(child.href, currentPath)
-                          ? { "aria-current": "page" as const }
-                          : {})}
-                      >
-                        {child.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <Self
+                  items={item.children}
+                  currentPath={currentPath}
+                  depth={depth + 1}
+                />
               )}
             </>
           ) : (
@@ -60,10 +125,10 @@ function isActive(href: string | undefined, current: string): boolean {
             </a>
           )}
         </li>
-      ))
-    }
-  </ul>
-</nav>
+      ))}
+    </ul>
+  )
+}
 
 <style>
   /* SN1-SN7: Matches mockup.html L318-358 exactly */
@@ -102,6 +167,15 @@ function isActive(href: string | undefined, current: string): boolean {
     background: var(--color-surface);
     border-left-color: var(--color-primary);
   }
+  /* Directory nodes render as nav-link but may not have an href; keep hover
+     subtle when disabled so users don't expect navigation. */
+  .nav-link.nav-dir-link[aria-disabled="true"] {
+    cursor: default;
+    color: var(--color-text);
+  }
+  .nav-link.nav-dir-link[aria-disabled="true"]:hover {
+    background: transparent;
+  }
   /* Group label sits to the left of the nav items to create visual hierarchy
      without indenting children, so children stay aligned with sibling controls
      (e.g. the legion selector) in the sidebar. */
@@ -118,5 +192,10 @@ function isActive(href: string | undefined, current: string): boolean {
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+  }
+  /* Deeper levels get progressive indent driven by --nav-depth. Each additional
+     depth adds one unit of --space-3 left padding on the link itself. */
+  .nav-children--nested {
+    padding-left: calc((var(--nav-depth, 1) - 1) * var(--space-3));
   }
 </style>

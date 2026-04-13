@@ -50,7 +50,7 @@ export const zh = {
   },
   categories: {
     frontend: "Web前端",
-    backend: "Web后端",
+    "web-backend": "Web后端",
     uncategorized: "未分类",
   },
 } as const;

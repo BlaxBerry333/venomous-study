@@ -2,8 +2,8 @@
 import LegionSelector from "@components/LegionSelector.astro";
 import LanguageSwitcher from "@components/LanguageSwitcher.astro";
 import NavItem from "@components/NavItem.astro";
-import { getPublishedDocs } from "@utils/collections";
-import { parseDocId, t, type Locale } from "@i18n/index";
+import { getNavTree } from "@utils/collections";
+import { t, type Locale } from "@i18n/index";
 
 interface Props {
   currentPath: string;
@@ -12,53 +12,10 @@ interface Props {
 
 const { currentPath, locale } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const docs = await getPublishedDocs(locale);
 const localePrefix = locale === "zh" ? "" : "ja/";
 const sidebarPersistName = `sidebar-${locale}`;
 
-// Build navigation tree from docs
-interface NavEntry {
-  label: string;
-  href?: string;
-  children?: NavEntry[];
-  isGroup?: boolean;
-}
-
-const categoryMap = new Map<string, NavEntry[]>();
-
-for (const doc of docs) {
-  const { slug } = parseDocId(doc.id);
-  const parts = slug.split("/");
-  const category = parts.length > 1 ? parts[0] : "uncategorized";
-
-  if (!categoryMap.has(category)) {
-    categoryMap.set(category, []);
-  }
-
-  categoryMap.get(category)!.push({
-    label: doc.data.title,
-    href: `${base}${localePrefix}${slug}`,
-  });
-}
-
-function translateCategory(name: string): string {
-  const key = `categories.${name}`;
-  const translated = t(key, locale);
-  // If the key is missing, t() returns the key itself; fall back to capitalized raw name.
-  if (translated === key) {
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  }
-  return translated;
-}
-
-const navItems: NavEntry[] = [];
-for (const [category, children] of categoryMap) {
-  navItems.push({
-    label: translateCategory(category),
-    isGroup: true,
-    children,
-  });
-}
+const navItems = await getNavTree(locale);
 ---
 
 <aside
