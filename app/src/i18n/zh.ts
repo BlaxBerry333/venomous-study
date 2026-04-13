@@ -2,7 +2,7 @@
 export const zh = {
   site: {
     name: "Venomous Study",
-    description: "个人学习笔记站，配色取自战锤 40K 各军团",
+    description: "个人学习笔记站，配色取自 Warhammer 40K 各军团",
   },
   nav: {
     openMenu: "打开导航",
@@ -15,10 +15,6 @@ export const zh = {
     langJa: "日本語",
     ariaLabel: "侧边栏",
     docsAriaLabel: "文档导航",
-  },
-  breadcrumb: {
-    home: "首页",
-    ariaLabel: "面包屑",
   },
   toc: {
     title: "本页目录",

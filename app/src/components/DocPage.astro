@@ -1,10 +1,9 @@
 ---
 import DocLayout from "@layouts/DocLayout.astro";
-import Breadcrumb from "@components/Breadcrumb.astro";
 import TableOfContents from "@components/TableOfContents.astro";
 import TranslationMissing from "@components/TranslationMissing.astro";
 import { render, type CollectionEntry } from "astro:content";
-import { buildBreadcrumbs, canonicalizeSlug } from "@utils/collections";
+import { canonicalizeSlug } from "@utils/collections";
 import { parseDocId, type Locale } from "@i18n/index";
 
 interface Props {
@@ -23,8 +22,6 @@ const rendered = isFallback ? null : await render(doc);
 const Content = rendered?.Content;
 const headings = rendered?.headings ?? [];
 
-const crumbs = buildBreadcrumbs(slug, base, locale);
-
 // Compute canonical path so backward-compat `/foo/index/` routes advertise
 // `/foo/` as their SEO canonical. Trailing slash matches Astro SSG output
 // (`foo/index.html` served at `/foo/`).
@@ -42,7 +39,6 @@ const canonicalPath = canonicalSlug
   locale={locale}
   canonicalPath={canonicalPath}
 >
-  <Breadcrumb crumbs={crumbs} />
   {
     isFallback && zhSlug ? (
       <TranslationMissing locale={locale} zhSlug={zhSlug} />

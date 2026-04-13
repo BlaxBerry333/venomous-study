@@ -1,23 +1,13 @@
 /* ========== Global Effects ========== */
-/* Selection, scrollbar, Astro Shiki code blocks, legion-switch transition. */
+/* Selection, scrollbar, Astro Shiki code blocks. */
 
-/* Legion color-switch transition: applied briefly on <html> when the user
-   changes legion. All elements ease their theme-driven properties to create
-   a smooth cross-fade without affecting normal interactions (hover, focus). */
-html.legion-transitioning,
-html.legion-transitioning *,
-html.legion-transitioning *::before,
-html.legion-transitioning *::after {
-  transition:
-    background-color 400ms ease,
-    background 400ms ease,
-    color 400ms ease,
-    border-color 400ms ease,
-    box-shadow 400ms ease,
-    fill 400ms ease,
-    stroke 400ms ease,
-    filter 400ms ease !important;
-}
+/* Legion color-switch fade: each interactive component owns its own
+   `transition` on theme-driven properties (background-color, color,
+   border-color). When `data-legion` changes the resolved values of
+   `--color-*` tokens, those component transitions interpolate naturally.
+   No global transitioning class, no JS reflow dance, no !important — this
+   eliminates the mid-animation restart that previously produced flicker
+   on hovered / active elements during legion swaps. */
 
 /* Selection */
 ::selection {
@@ -47,8 +37,12 @@ html.legion-transitioning *::after {
   scrollbar-color: var(--color-link-hover) var(--color-bg);
 }
 
-/* Code blocks (Astro Shiki output) */
-pre[class*="astro-code"] {
+/* Code blocks (Astro Shiki output).
+   Selectors are scoped with `.doc-content` so their specificity (0,2,1) wins
+   over the inline `.doc-content code` rule (0,1,1) in typography.css — which
+   is loaded AFTER this file. Without the scope boost, the inline-code
+   background / border / color would leak into `<pre><code>` blocks. */
+.doc-content pre[class*="astro-code"] {
   background: color-mix(in srgb, var(--color-bg) 60%, black) !important;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
   padding: var(--space-4);
@@ -57,8 +51,8 @@ pre[class*="astro-code"] {
   line-height: var(--line-height-relaxed);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
 }
-pre[class*="astro-code"] code {
-  background: none !important;
+.doc-content pre[class*="astro-code"] code {
+  background: none;
   padding: 0;
   border: none;
   border-radius: 0;

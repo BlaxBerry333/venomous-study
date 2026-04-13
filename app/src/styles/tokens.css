@@ -87,7 +87,7 @@
   --transition-glow: 300ms ease-in-out;
 
   /* ===== Layout ===== */
-  --sidebar-width: 260px;
+  --sidebar-width: 300px;
   /* Doc prose column (inside .doc-main). */
   --content-max-width: 48rem;
   /* Home page hero/category grid container. Wider than the doc column because

@@ -66,12 +66,15 @@ const labelClose = t("nav.closeMenu", locale);
     left: var(--sidebar-width);
     right: 0;
     height: var(--header-height);
-    background: var(--color-bg);
+    background-color: var(--color-bg-tertiary);
     border-bottom: var(--border-width) solid var(--color-border);
     display: flex;
     align-items: center;
     padding: 0 var(--space-6);
     z-index: 500;
+    transition:
+      background-color var(--transition-fast),
+      border-color var(--transition-fast);
   }
   .site-title-header {
     font-family: var(--font-heading);
@@ -99,11 +102,25 @@ const labelClose = t("nav.closeMenu", locale);
     display: block;
   }
 
-  /* ========== Global Watermark ========== */
+  /* ========== Global Watermark ==========
+     Horizontally centered in the "content region" — i.e. the viewport minus
+     whatever is reserved on either side (sidebar on the left at ≥1280px,
+     TOC column on the right when a TOC actually renders at ≥768px).
+
+     Uses two custom properties so every breakpoint × TOC × page layout
+     combination is expressed declaratively, without piling up overrides:
+       --wm-left:  reserved width on the left side  (sidebar)
+       --wm-right: reserved width on the right side (TOC)
+     Defaults are 0; media queries and `:has(.toc)` bump them to real values.
+   */
+  :root {
+    --wm-left: 0px;
+    --wm-right: 0px;
+  }
   #global-watermark {
     position: fixed;
     top: 50%;
-    left: calc(var(--sidebar-width) + (100vw - var(--sidebar-width)) / 2);
+    left: calc(var(--wm-left) + (100vw - var(--wm-left) - var(--wm-right)) / 2);
     transform: translate(-50%, -50%);
     width: 35vw;
     max-width: 400px;
@@ -113,6 +130,21 @@ const labelClose = t("nav.closeMenu", locale);
     user-select: none;
     z-index: 0;
     filter: brightness(0) invert(var(--logo-invert, 1));
+  }
+  /* ≥1280px: the fixed sidebar reserves its own column. */
+  @media (min-width: 1280px) {
+    :root {
+      --wm-left: var(--sidebar-width);
+    }
+  }
+  /* TOC column is reserved whenever a TOC actually renders (≥768px).
+     TableOfContents emits `display: none` at <768px, but the element is
+     still in the DOM — so we guard the reservation with a media query too
+     instead of only `:has(.toc)`. */
+  @media (min-width: 768px) {
+    body:has(.doc-main .toc) {
+      --wm-right: var(--toc-reserve);
+    }
   }
 
   /* ========== Main Layout ==========
@@ -134,7 +166,7 @@ const labelClose = t("nav.closeMenu", locale);
   .doc-main {
     max-width: var(--main-max-width);
     margin: 0 auto;
-    padding: calc(var(--header-height) + var(--space-3)) var(--space-8)
+    padding: calc(var(--header-height) + var(--space-8)) var(--space-8)
       var(--space-8) var(--space-8);
   }
   /* Reserve TOC column only when a TOC actually renders (TableOfContents
@@ -149,8 +181,10 @@ const labelClose = t("nav.closeMenu", locale);
     .site-header {
       display: none;
     }
+    /* Larger watermark on tablet/mobile to fill the wider content region
+       (sidebar is off-canvas). Position handled by the --wm-left / --wm-right
+       system above — no `left` override needed. */
     #global-watermark {
-      left: 50%;
       width: 60vw;
       max-width: 520px;
       min-width: 240px;
@@ -160,7 +194,7 @@ const labelClose = t("nav.closeMenu", locale);
       padding-left: 0;
     }
     .doc-main {
-      padding: var(--space-6) var(--space-6) var(--space-8) var(--space-6);
+      padding: var(--space-12) var(--space-6) var(--space-8) var(--space-6);
     }
     .doc-main:has(.toc) {
       padding-right: var(--toc-reserve);
@@ -170,7 +204,7 @@ const labelClose = t("nav.closeMenu", locale);
   /* ========== Responsive: < 768px (TOC hidden, reclaim right padding) ========== */
   @media (max-width: 767px) {
     .doc-main {
-      padding: var(--space-4) var(--space-4) var(--space-6);
+      padding: var(--space-8) var(--space-4) var(--space-6);
     }
     .doc-main:has(.toc) {
       padding-right: var(--space-4);

@@ -172,7 +172,7 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
     font-size: var(--font-size-sm);
     cursor: pointer;
     min-height: 44px;
-    transition: background var(--transition-fast);
+    transition: background-color var(--transition-fast);
   }
   .legion-selector-toggle:hover {
     background: var(--color-surface);
@@ -245,7 +245,7 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
     border-radius: var(--radius-sm);
     transition:
       color var(--transition-fast),
-      background var(--transition-fast);
+      background-color var(--transition-fast);
   }
   .legion-modal-close:hover {
     color: var(--color-text);
@@ -292,7 +292,7 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
     min-height: 44px;
     border-radius: var(--radius-sm);
     transition:
-      background var(--transition-fast),
+      background-color var(--transition-fast),
       color var(--transition-fast);
     background: none;
     border: none;
@@ -376,7 +376,11 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
 </style>
 
 <script>
-  import { DEFAULT_LEGION, LEGION_STORAGE_KEY } from "@utils/legions";
+  import {
+    DEFAULT_LEGION,
+    DEFAULT_ERA,
+    LEGION_STORAGE_KEY,
+  } from "@utils/legions";
 
   document.addEventListener("astro:page-load", () => {
     const _trigger = document.getElementById("legion-modal-trigger");
@@ -420,7 +424,10 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
     );
 
     let currentLegion = DEFAULT_LEGION;
-    let currentEra: Record<string, string> = {};
+    // Seed the era map so the default legion starts in DEFAULT_ERA (e.g.
+    // Sons of Horus → heresy = Black Legion). Other legions stay unseeded
+    // and fall back to "crusade" via the `|| "crusade"` guards downstream.
+    let currentEra: Record<string, string> = { [DEFAULT_LEGION]: DEFAULT_ERA };
 
     // Load from localStorage
     try {
@@ -429,7 +436,7 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
       );
       if (saved.legion) {
         currentLegion = saved.legion;
-        currentEra = saved.eras || {};
+        currentEra = saved.eras || currentEra;
       }
     } catch {
       /* ignore */
@@ -597,21 +604,14 @@ const traitorLegions = TRAITOR_LEGIONS.map((legion) => ({
       true,
     );
 
-    let transitionTimer: ReturnType<typeof setTimeout> | null = null;
-
     function applyLegion(legion: string, era: string) {
       const root = document.documentElement;
       if (!legion) legion = DEFAULT_LEGION;
 
-      // Trigger smooth cross-fade. Class is added just before the attribute
-      // swap and removed after the transition completes so hover/focus
-      // interactions aren't affected.
-      root.classList.add("legion-transitioning");
-      if (transitionTimer) clearTimeout(transitionTimer);
-      transitionTimer = setTimeout(() => {
-        root.classList.remove("legion-transitioning");
-      }, 450);
-
+      // Swap theme. Components with `transition: background-color/color/
+      // border-color ...` on their hover/active rules will ease smoothly
+      // as the resolved values of `--color-*` tokens change — no global
+      // transition class needed.
       root.setAttribute("data-legion", legion);
       if (era === "heresy") {
         root.setAttribute("data-legion-era", "heresy");

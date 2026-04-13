@@ -1,0 +1,59 @@
+---
+/**
+ * Home-page showcase: all legion identities rendered into the DOM, CSS picks
+ * the one matching <html data-legion> / data-legion-era. Centered prose — no
+ * boxes, no duplicate logo (the fixed watermark already shows it), no labels
+ * for primarch/homeworld (those are proper nouns; lore facts stand alone).
+ */
+import {
+  LOYAL_LEGIONS,
+  TRAITOR_LEGIONS,
+  type LoyalLegion,
+  type TraitorLegion,
+} from "@utils/legions";
+import { type Locale } from "@i18n/index";
+
+interface Props {
+  locale: Locale;
+}
+
+// locale is accepted for symmetry with other components; lore content is
+// English-only by design.
+const _locale: Locale = Astro.props.locale;
+void _locale;
+---
+
+<section class="legion-showcase" aria-live="polite">
+  {
+    LOYAL_LEGIONS.map((legion: LoyalLegion) => (
+      <article
+        class={`legion-card legion-card--${legion.id}`}
+        data-legion-id={legion.id}
+      >
+        <p class="legion-card-epithet">{legion.epithet}</p>
+        <p class="legion-card-desc">{legion.description}</p>
+      </article>
+    ))
+  }
+  {
+    TRAITOR_LEGIONS.map((legion: TraitorLegion) => (
+      <article
+        class={`legion-card legion-card--${legion.id}`}
+        data-legion-id={legion.id}
+      >
+        <p class="legion-card-epithet legion-card-epithet--crusade">
+          {legion.epithet}
+        </p>
+        <p class="legion-card-epithet legion-card-epithet--heresy">
+          {legion.patron}
+        </p>
+        <p class="legion-card-desc legion-card-desc--crusade">
+          {legion.description}
+        </p>
+        <p class="legion-card-desc legion-card-desc--heresy">
+          {legion.heresyDescription}
+        </p>
+      </article>
+    ))
+  }
+</section>

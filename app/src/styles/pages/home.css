@@ -1,5 +1,7 @@
-/* ========== Home Page ========== */
-/* Matches mockup.html L621-776. Used by index.astro (zh) and ja/index.astro. */
+/* ========== Home Page ==========
+   Minimal first-impression surface: hero → current legion identity →
+   navigation hint. The sidebar handles all actual navigation; this page
+   is deliberately brief. */
 
 .home-page {
   max-width: var(--page-max-width);
@@ -12,6 +14,7 @@
 
 .home-hero {
   text-align: center;
+  margin-top: var(--space-12);
   margin-bottom: var(--space-12);
 }
 .home-hero h1 {
@@ -43,141 +46,106 @@
   margin-top: var(--space-4);
 }
 
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-6);
-}
+/* ========== Legion Showcase ==========
+   Centered prose pushed toward the page bottom so it interlocks with the
+   vertically-centered legion watermark (the watermark sits at 50%; the
+   text sits below it). Overall opacity is dialed back so the text reads
+   as an atmospheric caption rather than a dominant block.
 
-/* Category card (L-corner decorations use pseudo-els + explicit corner elements) */
-.category-card {
-  background: rgba(0, 0, 0, 0.15);
-  border: var(--border-width) solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  padding: var(--space-6);
+   Typography:
+     epithet — tracked small-caps, primary color (the heading)
+     facts   — muted small-caps row: "Primarch · Homeworld"
+     desc    — body prose
+
+   All 18 cards live in the DOM; [data-legion] toggles which is visible.
+*/
+.legion-showcase {
   position: relative;
-  transition:
-    background var(--transition-normal),
-    border-color var(--transition-normal),
-    box-shadow var(--transition-glow);
-  height: 280px;
-  display: flex;
-  flex-direction: column;
+  max-width: 36rem;
+  /* Large top margin shifts the block below the watermark's vertical
+     center, creating the offset the user asked for. */
+  margin: 26vh auto var(--space-8) auto;
+  text-align: center;
+  opacity: 0.4;
 }
-.category-card:hover {
-  background: rgba(0, 0, 0, 0.25);
-  border-color: var(--color-primary);
-  box-shadow: 0 0 12px rgba(196, 163, 90, 0.15);
+.legion-card {
+  display: none;
+  padding: var(--space-2) 0;
 }
-.category-card::before,
-.category-card::after {
-  content: "";
-  position: absolute;
-  width: var(--corner-length);
-  height: var(--corner-length);
-  pointer-events: none;
-  opacity: 0.5;
-  transition: opacity var(--transition-normal);
-}
-.category-card:hover::before,
-.category-card:hover::after {
-  opacity: 0.9;
-}
-.category-card::before {
-  top: var(--space-2);
-  left: var(--space-2);
-  border-top: var(--corner-width) solid var(--color-primary);
-  border-left: var(--corner-width) solid var(--color-primary);
-}
-.category-card::after {
-  bottom: var(--space-2);
-  right: var(--space-2);
-  border-bottom: var(--corner-width) solid var(--color-primary);
-  border-right: var(--corner-width) solid var(--color-primary);
-}
-.category-card-corner-tr,
-.category-card-corner-bl {
-  position: absolute;
-  width: var(--corner-length);
-  height: var(--corner-length);
-  pointer-events: none;
-  opacity: 0.5;
-  transition: opacity var(--transition-normal);
-}
-.category-card:hover .category-card-corner-tr,
-.category-card:hover .category-card-corner-bl {
-  opacity: 0.9;
-}
-.category-card-corner-tr {
-  top: var(--space-2);
-  right: var(--space-2);
-  border-top: var(--corner-width) solid var(--color-primary);
-  border-right: var(--corner-width) solid var(--color-primary);
-}
-.category-card-corner-bl {
-  bottom: var(--space-2);
-  left: var(--space-2);
-  border-bottom: var(--corner-width) solid var(--color-primary);
-  border-left: var(--corner-width) solid var(--color-primary);
+html[data-legion="dark-angels"] .legion-showcase .legion-card--dark-angels,
+html[data-legion="white-scars"] .legion-showcase .legion-card--white-scars,
+html[data-legion="space-wolves"] .legion-showcase .legion-card--space-wolves,
+html[data-legion="imperial-fists"]
+  .legion-showcase
+  .legion-card--imperial-fists,
+html[data-legion="blood-angels"] .legion-showcase .legion-card--blood-angels,
+html[data-legion="iron-hands"] .legion-showcase .legion-card--iron-hands,
+html[data-legion="ultramarines"] .legion-showcase .legion-card--ultramarines,
+html[data-legion="salamanders"] .legion-showcase .legion-card--salamanders,
+html[data-legion="raven-guard"] .legion-showcase .legion-card--raven-guard,
+html[data-legion="emperors-children"]
+  .legion-showcase
+  .legion-card--emperors-children,
+html[data-legion="iron-warriors"] .legion-showcase .legion-card--iron-warriors,
+html[data-legion="night-lords"] .legion-showcase .legion-card--night-lords,
+html[data-legion="world-eaters"] .legion-showcase .legion-card--world-eaters,
+html[data-legion="death-guard"] .legion-showcase .legion-card--death-guard,
+html[data-legion="thousand-sons"] .legion-showcase .legion-card--thousand-sons,
+html[data-legion="sons-of-horus"] .legion-showcase .legion-card--sons-of-horus,
+html[data-legion="word-bearers"] .legion-showcase .legion-card--word-bearers,
+html[data-legion="alpha-legion"] .legion-showcase .legion-card--alpha-legion {
+  display: block;
 }
 
-.category-card h2 {
+.legion-card-epithet {
   font-family: var(--font-heading);
   font-size: var(--font-size-xl);
-  color: var(--color-primary);
-  text-transform: capitalize;
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-.category-card ul {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  overflow-y: auto;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-.category-card a {
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: var(--space-1) var(--space-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border-radius: var(--radius-sm);
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast),
-    padding-left var(--transition-fast);
-}
-.category-card a:hover {
-  color: var(--color-link-hover);
-  background: var(--color-bg-tertiary);
-  padding-left: var(--space-3);
-}
-.category-card .sub-category {
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-secondary);
-  display: block;
-  padding: var(--space-1) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--color-primary);
+  margin: 0 0 var(--space-6) 0;
+  line-height: var(--line-height-tight, 1.2);
+  transition: color var(--transition-normal);
 }
-.category-card .sub-doc-list {
-  padding-left: var(--space-4);
-  margin-top: var(--space-1);
+.legion-card-desc {
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  font-style: italic;
+  line-height: var(--line-height-relaxed);
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+
+/* Era swap (traitor only): crusade content shown by default, heresy
+   content shown when <html data-legion-era="heresy">. */
+.legion-card-epithet--heresy,
+.legion-card-desc--heresy {
+  display: none;
+}
+html[data-legion-era="heresy"] .legion-card-epithet--crusade,
+html[data-legion-era="heresy"] .legion-card-desc--crusade {
+  display: none;
+}
+html[data-legion-era="heresy"] .legion-card-epithet--heresy {
+  display: block;
+}
+html[data-legion-era="heresy"] .legion-card-desc--heresy {
+  display: block;
 }
 
 /* Responsive: <1280px (drawer mode) */
 @media (max-width: 1279px) {
   .home-page {
     padding: var(--space-6);
-    padding-top: var(--space-8);
+    padding-top: var(--space-12);
   }
   .home-hero h1 {
     font-size: var(--font-size-3xl);
+  }
+  .legion-showcase {
+    margin-top: 20vh;
   }
 }
 
@@ -185,9 +153,13 @@
 @media (max-width: 767px) {
   .home-page {
     padding: var(--space-4);
-    padding-top: var(--space-6);
+    padding-top: var(--space-8);
   }
   .home-hero h1 {
     font-size: var(--font-size-2xl);
+  }
+  .legion-card-epithet {
+    font-size: var(--font-size-lg);
+    letter-spacing: 0.12em;
   }
 }

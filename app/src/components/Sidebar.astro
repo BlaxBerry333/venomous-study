@@ -58,10 +58,13 @@ const currentL3Path = getCurrentL3Path(currentNavPath);
     left: 0;
     bottom: 0;
     width: var(--sidebar-width);
-    background: var(--color-bg-tertiary);
+    background-color: var(--color-bg-tertiary);
     border-right: var(--border-width) solid var(--color-border);
     overflow: hidden;
     z-index: var(--z-sidebar);
+    transition:
+      background-color var(--transition-fast),
+      border-color var(--transition-fast);
   }
   .sidebar-inner {
     padding: var(--space-4) var(--space-4) var(--space-6);
@@ -85,11 +88,22 @@ const currentL3Path = getCurrentL3Path(currentNavPath);
     text-decoration: none;
   }
 
+  /* ≥1280px: the fixed site-header already shows the site name,
+     so hide the duplicate sidebar-home link to avoid redundancy. */
+  @media (min-width: 1280px) {
+    .sidebar-home {
+      display: none;
+    }
+  }
+
   /* Responsive: <1280px — sidebar becomes drawer (including tablet range) */
   @media (max-width: 1279px) {
     .doc-sidebar {
       transform: translateX(-100%);
-      transition: transform var(--transition-slow);
+      transition:
+        transform var(--transition-slow),
+        background-color var(--transition-fast),
+        border-color var(--transition-fast);
       z-index: var(--z-sidebar);
     }
     .doc-sidebar.is-open {

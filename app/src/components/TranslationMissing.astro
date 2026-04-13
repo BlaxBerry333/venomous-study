@@ -26,23 +26,18 @@ const homeHref = `${base}ja/`;
 </section>
 
 <style>
-  /* Fill the remaining viewport below header + breadcrumb + main padding.
-     Uses flex basis rather than magic numbers: sibling .breadcrumb has a
-     known height via min-height:44px + margin-bottom. We offset by that and
-     all ancestor vertical padding using --tm-offset (computed per breakpoint). */
+  /* Fill the remaining viewport below header + main padding. */
   .translation-missing {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* Desktop: header(44) + main pad-top(header+space-3) + main pad-bottom(space-8) + breadcrumb(44 + space-6) */
+    /* Desktop: main pad-top(header-height + space-8) + main pad-bottom(space-8) */
     height: calc(
-      100vh - var(--header-height) - var(--space-3) - var(--space-8) - 44px -
-        var(--space-6)
+      100vh - var(--header-height) - var(--space-8) - var(--space-8)
     );
     height: calc(
-      100dvh - var(--header-height) - var(--space-3) - var(--space-8) - 44px -
-        var(--space-6)
+      100dvh - var(--header-height) - var(--space-8) - var(--space-8)
     );
     text-align: center;
     gap: var(--space-4);
@@ -50,25 +45,17 @@ const homeHref = `${base}ja/`;
 
   @media (max-width: 1279px) {
     .translation-missing {
-      /* Drawer mode (<1280): no fixed header; main pad(space-6 + space-8) + breadcrumb(44 + space-6) */
-      height: calc(
-        100vh - var(--space-6) - var(--space-8) - 44px - var(--space-6)
-      );
-      height: calc(
-        100dvh - var(--space-6) - var(--space-8) - 44px - var(--space-6)
-      );
+      /* Drawer mode (<1280): no fixed header; main pad(space-12 + space-8) */
+      height: calc(100vh - var(--space-12) - var(--space-8));
+      height: calc(100dvh - var(--space-12) - var(--space-8));
     }
   }
 
   @media (max-width: 767px) {
     .translation-missing {
-      /* Mobile: main pad(space-4 + space-6) + breadcrumb(44 + space-6) */
-      height: calc(
-        100vh - var(--space-4) - var(--space-6) - 44px - var(--space-6)
-      );
-      height: calc(
-        100dvh - var(--space-4) - var(--space-6) - 44px - var(--space-6)
-      );
+      /* Mobile: main pad(space-8 + space-6) */
+      height: calc(100vh - var(--space-8) - var(--space-6));
+      height: calc(100dvh - var(--space-8) - var(--space-6));
     }
   }
   .tm-title {

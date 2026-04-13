@@ -50,8 +50,16 @@
 
 /* ========== Responsive: < 768px ========== */
 @media (max-width: 767px) {
+  /* Keep h1 one step larger than h2 (which is 2xl by default) so the
+     hierarchy survives. */
   .doc-content h1 {
     font-size: var(--font-size-2xl);
+  }
+  .doc-content h2 {
+    font-size: var(--font-size-xl);
+  }
+  .doc-content h3 {
+    font-size: var(--font-size-lg);
   }
 }
 

@@ -19,10 +19,6 @@ export const ja: Dictionary = {
     ariaLabel: "サイドバー",
     docsAriaLabel: "ドキュメントナビゲーション",
   },
-  breadcrumb: {
-    home: "ホーム",
-    ariaLabel: "パンくずリスト",
-  },
   toc: {
     title: "このページの目次",
     ariaLabel: "このページの目次",

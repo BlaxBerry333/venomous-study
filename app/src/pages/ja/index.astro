@@ -1,11 +1,9 @@
 ---
 import DocLayout from "@layouts/DocLayout.astro";
-import CategoryNode from "@components/CategoryNode.astro";
-import { getNavTree } from "@utils/collections";
+import LegionShowcase from "@components/LegionShowcase.astro";
 import { t, type Locale } from "@i18n/index";
 
 const locale: Locale = "ja";
-const navTree = await getNavTree(locale);
 const siteName = t("site.name", locale);
 const heroDescription = t("site.description", locale);
 ---
@@ -18,22 +16,7 @@ const heroDescription = t("site.description", locale);
         <p>{heroDescription}</p>
       </div>
 
-      <div class="category-grid">
-        {
-          navTree.map((category) => (
-            <section class="category-card">
-              <span class="category-card-corner-tr" />
-              <span class="category-card-corner-bl" />
-              <h2>{category.label}</h2>
-              <ul>
-                {(category.children ?? []).map((child) => (
-                  <CategoryNode node={child} />
-                ))}
-              </ul>
-            </section>
-          ))
-        }
-      </div>
+      <LegionShowcase locale={locale} />
     </div>
   </div>
 </DocLayout>

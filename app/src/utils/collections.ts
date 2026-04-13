@@ -407,30 +407,3 @@ export async function getNavTree(locale: Locale): Promise<NavNode[]> {
       return a.segment.localeCompare(b.segment);
     });
 }
-
-/**
- * Builds breadcrumb items for a slug. The first segment is the localized "Home" label.
- */
-export function buildBreadcrumbs(
-  slug: string,
-  base: string = "/",
-  locale: Locale,
-): { label: string; href?: string }[] {
-  // Guard: strip trailing `/index` so breadcrumbs for `foo/bar/index.mdx`
-  // render as [Home, Foo, Bar] instead of [Home, Foo, Bar, Index].
-  const canonicalSlug = canonicalizeSlug(slug);
-  const parts = canonicalSlug.split("/");
-  const homeHref = locale === "zh" ? base : `${base}ja/`;
-  const crumbs: { label: string; href?: string }[] = [
-    { label: t("breadcrumb.home", locale), href: homeHref },
-  ];
-
-  for (let i = 0; i < parts.length; i++) {
-    const label = parts[i]
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-    crumbs.push({ label });
-  }
-
-  return crumbs;
-}
