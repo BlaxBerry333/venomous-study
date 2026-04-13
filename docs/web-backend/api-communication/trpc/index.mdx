@@ -1,0 +1,195 @@
+---
+title: tRPC
+description: TypeScript 全栈端到端类型安全的 RPC 框架
+category: web-backend
+tags:
+  - trpc
+  - typescript
+created: 2026-04-13
+order: 0
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+tRPC 是一个**基于 TypeScript 的端到端类型安全 RPC 框架**。客户端像调用本地函数一样调用服务端过程，类型从服务端代码直接推导到客户端，**无需 codegen、无需 Schema 文件**。
+
+<Callout>
+**特点**
+
+- 端到端类型安全：服务端修改接口，客户端立即得到类型提示
+- 客户端像调用本地函数一样调用远程过程，不定义 HTTP 方法和路径
+- 同一页面多个 tRPC 请求自动合并为一个 HTTP 请求（batching）
+- 与 TanStack Query 深度集成，开箱即用缓存、乐观更新、无限滚动
+
+</Callout>
+
+<Callout>
+**局限**
+
+- **仅限 TypeScript**：前后端必须都是 TS，无法服务非 TS 客户端
+- **前后端强耦合**：类型变更直接传播，适合同一团队，不适合对外 API
+- **生态较小**：相比 REST / GraphQL，社区工具、中间件有限
+- **调试不友好**：默认 SuperJSON 序列化 + batching 合并响应，DevTools Network 面板基本不可读
+
+</Callout>
+
+<Callout>
+**适用场景**
+
+- TypeScript 全栈项目、前后端同团队或 monorepo
+- 追求最快开发速度和零配置类型安全
+- 不需要对外暴露 API 给第三方
+
+</Callout>
+
+## REST vs tRPC 的调用形态
+
+```txt
+┏━━━━━━━━ REST API Client ━━━━━┓ ┏━━━━━━━━━━━━ REST API Server ━━━━━━━━━━━━━━┓
+┃                              ┃ ┃                                            ┃
+┃ axios.get("/api/user")      ━━━━  GET  ━━━▶ /api/user   ━━▶ getUserList     ┃
+┃ axios.get("/api/user/1")    ━━━━  GET  ━━━▶ /api/user/1 ━━▶ getUserById     ┃
+┃ axios.post("/api/user")     ━━━━  POST ━━━▶ /api/user   ━━▶ createUser      ┃
+┃ axios.put("/api/user/1")    ━━━━  PUT  ━━━▶ /api/user/1 ━━▶ updateUserById  ┃
+┃ axios.delete("/api/user/1") ━━━ DELETE ━━━▶ /api/user/1 ━━▶ deleteUserById  ┃
+┃                              ┃ ┃                                            ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+┏━━━━━━━━━ tRPC Client ━━━━━━━━┓ ┏━━━━━━━━━━━━━ tRPC Server ━━━━━━━━━━━━━━━━━┓
+┃                              ┃ ┃                                            ┃
+┃ trpc.getUserList.query()   ━━━━━━━━━━━━▶   getUserList                      ┃
+┃ trpc.getUserById.query()   ━━━━━━━━━━━━▶   getUserById                      ┃
+┃ trpc.createUser.mutate()   ━━━━━━━━━━━━▶   createUser                       ┃
+┃ trpc.updateUserById.mutate()━━━━━━━━━━━▶   updateUserById                   ┃
+┃ trpc.deleteUserById.mutate()━━━━━━━━━━━▶   deleteUserById                   ┃
+┃                              ┃ ┃                                            ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+```
+
+## 基础概念
+
+| 概念                 | 一句话说明                                           | 详细                                                                        |
+| -------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| Router（路由器）     | 组织和注册所有 API 端点的容器                        | [详见](/web-backend/api-communication/trpc/router-and-procedure#router)     |
+| Procedure（过程）    | 单个 API 端点，分为 `query`（读）和 `mutation`（写） | [详见](/web-backend/api-communication/trpc/router-and-procedure#procedure)  |
+| Context（上下文）    | 每个请求共享的数据（数据库连接、session 等）         | [详见](/web-backend/api-communication/trpc/router-and-procedure#context)    |
+| Middleware（中间件） | 在 procedure 执行前后插入逻辑（鉴权、日志）          | [详见](/web-backend/api-communication/trpc/router-and-procedure#middleware) |
+| Client（客户端对象） | 客户端调用服务端 procedure 的类型安全代理            | [详见](/web-backend/api-communication/trpc/router-and-procedure#client)     |
+
+## 类型推导原理
+
+tRPC 不需要 codegen、不需要 Schema 文件——**类型直接从服务端代码推导到客户端**。
+
+```txt
+GraphQL:  Schema (.graphql) → codegen → 生成 TS 类型 → 客户端使用
+tRPC:     服务端代码 → TypeScript 编译器直接推导 → 客户端自动获得类型
+```
+
+核心机制：
+
+```ts
+// 服务端：定义 procedure
+const appRouter = router({
+  getUser: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      return db.user.findUnique({ where: { id: input.id } });
+    }),
+});
+
+// 只导出类型，不导出运行时代码
+export type AppRouter = typeof appRouter;
+```
+
+```ts
+// 客户端：import 类型
+import type { AppRouter } from "../server/router";
+
+const trpc = createTRPCClient<AppRouter>({
+  /* ... */
+});
+
+// TS 自动推导：
+// - trpc.getUser.query({ id: "1" }) 的输入必须是 { id: string }
+// - 返回值类型自动是 User | null
+// - 服务端改了字段名，客户端立即报类型错误
+```
+
+<Callout>
+**要点：为什么不需要 codegen**
+
+- 利用 TypeScript 的 `typeof` + 泛型推导——`AppRouter` 类型包含了所有 procedure 的输入/输出
+- `import type` 只在编译时存在，不会打包到客户端 JS
+- **前提**：前后端必须在同一个 TypeScript 项目（monorepo），否则类型无法传递
+
+</Callout>
+
+## 下载安装
+
+```zsh
+% npm install @trpc/server @trpc/client zod
+```
+
+客户端如果用 React + TanStack Query：
+
+```zsh
+% npm install @trpc/react-query @tanstack/react-query
+```
+
+## 基本使用
+
+基本流程：
+
+1. **服务端**：初始化 `t` 实例 → 定义 Router 和 Procedure → 导出 `AppRouter` 类型
+2. **服务端**：挂载 HTTP handler（Fetch adapter / Next.js Route Handler / Express middleware 等）
+3. **客户端**：用 `createTRPCClient<AppRouter>()` 或 `createTRPCReact<AppRouter>()` 创建代理
+4. **客户端**：调用 `.query()` / `.mutate()`，享受类型推导
+
+### 最小可跑示例
+
+服务端：
+
+```ts
+// server.ts
+import { initTRPC } from "@trpc/server";
+import { createHTTPServer } from "@trpc/server/adapters/standalone";
+import { z } from "zod";
+
+const t = initTRPC.create();
+
+const appRouter = t.router({
+  hello: t.procedure
+    .input(z.object({ name: z.string() }))
+    .query(({ input }) => `Hello ${input.name}`),
+});
+
+export type AppRouter = typeof appRouter;
+
+createHTTPServer({ router: appRouter }).listen(3000);
+```
+
+客户端：
+
+```ts
+// client.ts
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import type { AppRouter } from "./server";
+
+const trpc = createTRPCClient<AppRouter>({
+  links: [httpBatchLink({ url: "http://localhost:3000" })],
+});
+
+const greeting = await trpc.hello.query({ name: "Alice" });
+// greeting 自动推导为 string；传 { name: 1 } 会编译报错
+```
+
+完整 Router / Context / Middleware / React 集成见 [Router 与 Procedure](/web-backend/api-communication/trpc/router-and-procedure)。
+
+## 与 GraphQL 对比
+
+完整对比表与判断流程见 [GraphQL 总览 — GraphQL vs tRPC](/web-backend/api-communication/graphql#graphql-vs-trpc)。
+
+一句话判断原则：**前端只有 TS 客户端 + 同团队 → tRPC；否则 GraphQL**。

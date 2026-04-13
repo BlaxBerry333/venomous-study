@@ -1,0 +1,232 @@
+---
+title: Schema 与 Resolver
+description: Schema SDL 语法、操作类型（Query/Mutation/Subscription）、Resolver 工作机制与 codegen
+category: web-backend
+tags:
+  - graphql
+  - schema
+  - resolver
+created: 2026-04-13
+order: 1
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+Schema 和 Resolver 是 GraphQL 服务端的两根支柱：Schema 声明"有什么数据、什么类型、支持哪些操作"，Resolver 实现"每个字段具体怎么取数据"。本文把两者放在一起讲，因为它们强耦合——Schema 里的每个字段，Resolver 里通常都要有对应实现。
+
+## Schema
+
+Schema 是用 **SDL**（Schema Definition Language）写的类型定义文件，描述整个 API 的契约。
+
+### 标量类型
+
+| 标量      | 说明                         |
+| --------- | ---------------------------- |
+| `Int`     | 32 位整数                    |
+| `Float`   | 浮点数                       |
+| `String`  | UTF-8 字符串                 |
+| `Boolean` | `true` / `false`             |
+| `ID`      | 唯一标识符（序列化为字符串） |
+
+可自定义标量（如 `DateTime`、`JSON`），需由运行时实现解析/序列化逻辑。
+
+### 对象类型
+
+```graphql
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  age: Int
+  posts: [Post!]!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  author: User!
+}
+```
+
+- `!` 表示非空（如 `String!`）
+- `[Post!]!` 表示"非空的 Post 数组，且数组元素也非空"
+- 对象类型可以相互引用，形成图结构
+
+### 操作类型
+
+Schema 中三个特殊的根类型定义 API 的**入口**：
+
+| 操作           | 含义           | 类比                 |
+| -------------- | -------------- | -------------------- |
+| `Query`        | 读数据         | HTTP GET             |
+| `Mutation`     | 改数据         | HTTP POST/PUT/DELETE |
+| `Subscription` | 订阅实时数据流 | WebSocket 推送       |
+
+```graphql
+type Query {
+  user(id: ID!): User
+  posts(limit: Int = 10): [Post!]!
+}
+
+type Mutation {
+  createUser(name: String!, email: String!): User!
+  deleteUser(id: ID!): Boolean!
+}
+
+type Subscription {
+  postAdded: Post!
+}
+```
+
+<Callout>
+**要点**
+
+- `Query` 和 `Mutation` 在协议层**没有区别**，都走 `POST /graphql`。约定：只读用 Query，写操作用 Mutation
+- `Subscription` 需要 WebSocket 等长连接支持，不是所有 GraphQL 服务器都开启
+
+</Callout>
+
+### 输入类型
+
+Mutation 参数通常用 `input` 类型聚合：
+
+```graphql
+input CreateUserInput {
+  name: String!
+  email: String!
+  age: Int
+}
+
+type Mutation {
+  createUser(input: CreateUserInput!): User!
+}
+```
+
+### 接口与联合类型
+
+```graphql
+interface Node {
+  id: ID!
+}
+
+type User implements Node {
+  id: ID!
+  name: String!
+}
+
+union SearchResult = User | Post
+```
+
+接口用于"所有类型都有 id" 这类共性；联合类型用于"一个字段可能是这几种类型之一"。
+
+## Resolver
+
+Resolver 是后端为 Schema 每个字段提供的**取数据函数**。结构上是一个按类型嵌套的对象：
+
+```ts
+const resolvers = {
+  Query: {
+    user: async (_, { id }, ctx) => ctx.db.user.findUnique({ where: { id } }),
+    posts: async (_, { limit }, ctx) => ctx.db.post.findMany({ take: limit }),
+  },
+  Mutation: {
+    createUser: async (_, { input }, ctx) =>
+      ctx.db.user.create({ data: input }),
+  },
+  User: {
+    // User.posts 字段如何取数据
+    posts: async (parent, _, ctx) =>
+      ctx.db.post.findMany({ where: { authorId: parent.id } }),
+  },
+};
+```
+
+### Resolver 签名
+
+每个 resolver 函数接收四个参数：
+
+```ts
+(parent, args, context, info) => value;
+```
+
+| 参数      | 含义                                                      |
+| --------- | --------------------------------------------------------- |
+| `parent`  | 父字段的返回值（根 resolver 为 `undefined`）              |
+| `args`    | 客户端传入的参数（如 `user(id: "1")` 的 `{ id: "1" }`）   |
+| `context` | 每次请求共享的对象（数据库连接、当前用户、DataLoader 等） |
+| `info`    | 查询 AST、字段路径等元信息（高级场景用）                  |
+
+### 执行流程
+
+查询 `user(id: "1") { name posts { title } }` 的执行顺序：
+
+```txt
+①  Query.user(_, {id:"1"}) → 返回 User 对象 { id, name, ... }
+②  User.name(parent) → 默认 resolver 直接取 parent.name
+③  User.posts(parent, args, ctx) → 查询 post 表，返回数组
+④  对每个 Post：Post.title(parent) → 默认 resolver 取 parent.title
+```
+
+<Callout>
+**陷阱：N+1 问题**
+
+第 ③ 步对每个 User 都触发一次 `post` 查询。如果同时查了 100 个 User，就有 1 + 100 次查询。必须用 DataLoader 批量化。
+
+详见 [N+1 与 DataLoader](/web-backend/api-communication/graphql/n-plus-one-and-dataloader)。
+
+</Callout>
+
+### 默认 resolver
+
+如果 Schema 字段名和 parent 对象的属性名一致，且不需要额外逻辑，可以**不写 resolver**。GraphQL 运行时会自动取 `parent[fieldName]`。
+
+只有字段名不匹配、或需要加工数据、或需要从关联表取数据时，才需要显式写 resolver。
+
+## codegen
+
+codegen（code generation）指的是**读取 Schema 自动生成前端 TypeScript 类型**的工具链，让前端的 Query 字符串也能享受类型推导。
+
+### 工作流程
+
+```txt
+后端 schema.graphql
+        │
+        ▼
+前端配置 codegen.yml
+        │
+        ├─ generates:
+        │    ./src/gql/types.ts     （全量类型定义）
+        │    ./src/gql/hooks.ts     （可选：自动生成 React Hook）
+        │
+        ▼
+前端写 Query
+        │
+        ▼
+TypeScript 自动获得
+  - Query 变量类型
+  - 返回数据类型
+  - Hook 类型
+```
+
+### 常见工具
+
+| 工具                                      | 场景                                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `@graphql-codegen/cli`                    | 官方最通用的 codegen 工具链                                                                 |
+| `@graphql-codegen/client-preset`          | **现代首选**：统一生成 `graphql()` + 类型 + `TypedDocumentNode`，对接 Apollo / urql / Relay |
+| `graphql-codegen typescript-operations`   | 为每个 Query/Mutation 生成具体输入输出类型（和 `client-preset` 二选一）                     |
+| `graphql-codegen typescript-react-apollo` | 旧式预设，生成 Apollo 的 `useQuery` 等 Hook，新项目建议改用 `client-preset`                 |
+
+### 前后端分工总结
+
+```txt
+protobuf:  后端写 .proto    → protoc 编译   → 前后端各拿到自己语言的类型
+tRPC:      后端写 procedure → TS 编译器直接 → 前端自动拿到类型（零 codegen）
+GraphQL:   后端写 Schema    → codegen 生成  → 前端拿到 TS 类型 + 自己写 Query
+```
+
+GraphQL 比 tRPC/protobuf 多一步：前端除了拿到类型，还要**自己写 Query/Mutation 指定要哪些字段**。这是 GraphQL 的核心特点——前端有查询自由度，但也因此多了 codegen 这一步。
+
+回到 [GraphQL 总览](/web-backend/api-communication/graphql)

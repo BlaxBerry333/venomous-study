@@ -1,0 +1,168 @@
+---
+title: API 通信
+description: Web 前后端之间的数据请求方式与实时通信方案选型
+category: web-backend
+tags:
+  - api
+  - communication
+  - overview
+created: 2026-04-13
+order: 0
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+Web 前后端之间的数据交互可以分为两类：**请求-响应式数据请求**（前端主动拉取或提交数据）和**实时通信**（服务端推送或双方互发）。两类问题分别有各自的主流方案，选型逻辑也完全不同。
+
+<Callout>
+**两类问题、两套方案**
+
+- **数据请求** — REST、GraphQL、tRPC、gRPC：前端发起调用，拿一次结果
+- **实时通信** — HTTP 轮询、SSE、WebSocket：连接保持开放，数据持续流动
+
+</Callout>
+
+## 数据请求方式
+
+四种主流方案，**先看选型结论，再看细节**：
+
+<Callout>
+**怎么选**
+
+- **对外公开 API / 简单 CRUD** → **[REST](/web-backend/api-communication/rest)**（最成熟、生态最全）
+- **多客户端灵活查询（Web + Mobile 共用 API）** → **[GraphQL](/web-backend/api-communication/graphql)**
+- **TypeScript 全栈内部项目** → **[tRPC](/web-backend/api-communication/trpc)**（零配置类型安全，开发最快）
+- **微服务间通信 / 高性能 / 多语言互调** → **[gRPC](/web-backend/api-communication/grpc)**
+
+</Callout>
+
+### REST
+
+> 详见 [REST](/web-backend/api-communication/rest)
+
+最传统的方案。每个资源一个 URL，用 HTTP 方法（GET/POST/PUT/DELETE）表示操作。
+
+- 接口定义：URL + HTTP 方法（`GET /api/users/1`）
+- 类型安全：需额外工具（OpenAPI + codegen）
+- 缓存：HTTP 原生缓存 + CDN，生态最成熟
+- 适用：公开 API、简单 CRUD、需要 HTTP 缓存的场景
+
+### GraphQL
+
+> 详见 [GraphQL](/web-backend/api-communication/graphql)
+
+客户端精确指定要什么字段，一次请求拿到所有关联数据。
+
+- 接口定义：Schema（SDL）+ 单一端点（`POST /graphql`）
+- 类型安全：Schema 自带类型，可 codegen 生成客户端类型
+- 缓存：不支持 HTTP 缓存，需客户端方案（Apollo Cache）
+- 适用：多客户端共用 API、数据关系复杂、前端需要灵活组合
+
+### tRPC
+
+> 详见 [tRPC](/web-backend/api-communication/trpc)
+
+客户端直接调用服务端函数，TypeScript 编译器自动推导类型。
+
+- 接口定义：就是 TypeScript 函数，没有中间层
+- 类型安全：**零配置端到端类型安全**，不需要 Schema 和 codegen
+- 缓存：依赖 TanStack Query
+- 局限：**仅限 TypeScript**，不能服务非 TS 客户端
+
+### gRPC
+
+> 详见 [gRPC](/web-backend/api-communication/grpc)
+
+基于 HTTP/2 + [Protocol Buffers](/web-backend/api-communication/protobuf) 的高性能 RPC 框架。
+
+- 接口定义：`.proto` 文件（强类型契约），codegen 生成多语言代码
+- 类型安全：protobuf codegen 多语言类型安全
+- 缓存：不支持 HTTP 缓存
+- 适用：微服务内部通信、高吞吐低延迟、流式传输、多语言服务互调
+
+### 对比速查
+
+| 维度     | [REST](/web-backend/api-communication/rest) | [GraphQL](/web-backend/api-communication/graphql) | [tRPC](/web-backend/api-communication/trpc) | [gRPC](/web-backend/api-communication/grpc) |
+| -------- | ------------------------------------------- | ------------------------------------------------- | ------------------------------------------- | ------------------------------------------- |
+| 数据获取 | 服务端决定返回结构                          | 客户端指定字段                                    | 调用服务端函数                              | 调用 Stub 方法                              |
+| 类型安全 | OpenAPI + codegen                           | Schema + codegen                                  | TS 编译器自动推导                           | protobuf + codegen                          |
+| 多语言   | 任意                                        | 任意                                              | 仅 TS                                       | 10+ 语言                                    |
+| 缓存     | HTTP 原生                                   | 需客户端方案                                      | TanStack Query                              | 不支持                                      |
+| 浏览器   | 原生支持                                    | 原生支持                                          | 原生支持                                    | 需 gRPC-Web 代理                            |
+
+## 实时通信选型
+
+<Callout>
+**怎么选**
+
+- 大多数"实时"场景其实只需要 **[SSE](/web-backend/api-communication/sse)** —— 通知推送、实时数据面板、AI 流式输出都是服务端单向推送，客户端发数据用普通 HTTP 请求即可
+- 只有**双方需要随时互发消息**的场景（聊天室、在线游戏、协同编辑）才真正需要 **[WebSocket](/web-backend/api-communication/websocket)**
+- **HTTP 轮询**仅在基础设施不支持长连接或实时性要求极低时使用
+
+</Callout>
+
+### HTTP 轮询
+
+> Polling
+
+客户端每隔 N 秒发一次请求问"有新数据吗"，最简单但最浪费。
+
+- 通信方向：客户端主动请求（单向）
+- 实现复杂度：低
+- 适用：兼容性要求极高、实时性要求极低
+
+### SSE
+
+> Server-Sent Events，详见 [SSE](/web-backend/api-communication/sse)
+
+服务端通过一个不关闭的 HTTP 响应持续推送数据。
+
+- 通信方向：服务端 → 客户端（单向）
+- 协议：普通 HTTP（`http://` / `https://`）
+- 浏览器原生支持自动重连和断点恢复（`Last-Event-ID`）
+- 数据格式：仅文本
+- 适用：通知推送、日志流、AI 流式输出
+
+### WebSocket
+
+> 详见 [WebSocket](/web-backend/api-communication/websocket)
+
+客户端和服务端通过协议升级建立全双工连接，双方可以随时互发消息。
+
+- 通信方向：全双工（双向）
+- 协议：`ws://` / `wss://`（HTTP 握手后升级）
+- 需手动实现重连逻辑
+- 数据格式：文本 + 二进制
+- 适用：聊天、游戏、协同编辑
+
+### 对比速查
+
+| 维度     | HTTP 轮询        | SSE               | WebSocket                   |
+| -------- | ---------------- | ----------------- | --------------------------- |
+| 通信方向 | 客户端主动       | 服务端 → 客户端   | 全双工                      |
+| 连接方式 | 短连接           | 长连接（HTTP）    | 长连接（协议升级）          |
+| 头部开销 | 每次完整 HTTP 头 | 仅首次            | 握手后 2~14 字节            |
+| 自动重连 | 不适用           | 浏览器原生        | 需手动实现                  |
+| 跨域     | CORS             | CORS              | 无同源限制（需验证 Origin） |
+| 二进制   | 不支持           | 不支持            | 支持（ArrayBuffer / Blob）  |
+| 扩展性   | 无状态，天然扩展 | HTTP 基础设施支持 | 有状态，需 Redis Pub/Sub 等 |
+
+## 综合场景：游戏连携服务
+
+游戏场景通常包含多种实时需求，不同需求适合不同方案：
+
+| 需求                          | 方案            | 理由                                        |
+| ----------------------------- | --------------- | ------------------------------------------- |
+| 游戏状态同步（操作 ↔ 服务器） | **WebSocket**   | 双向低延迟，支持二进制数据                  |
+| 排行榜 / 活动公告推送         | **SSE**         | 服务端单向推送，HTTP 基础设施天然兼容       |
+| 好友在线状态                  | **WebSocket**   | 需要双向（上报自己状态 + 接收好友状态变化） |
+| 历史记录 / 成就查询           | **REST / tRPC** | 普通数据请求，不需要实时                    |
+
+<Callout>
+**要点**
+
+不要对所有需求都用 WebSocket —— 维护成本高、扩展复杂。**按需求拆分**：实时双向用 WebSocket，单向推送用 SSE，普通查询用 HTTP。
+
+</Callout>

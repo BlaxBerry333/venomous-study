@@ -1,0 +1,281 @@
+---
+title: Protocol Buffers
+description: 跨语言的数据序列化格式与接口定义语言
+category: web-backend
+tags:
+  - protobuf
+  - serialization
+  - idl
+created: 2026-04-13
+order: 0
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+> protobuf / pb
+
+Protocol Buffers 是 Google 开源的**跨语言数据序列化格式**和**接口定义语言（IDL）**。通过 `.proto` 文件定义数据结构，编译生成多语言代码。
+
+<Callout>
+**特点**
+
+- 二进制序列化：体积比 JSON 小 3~10 倍，解析速度快数倍
+- 跨语言代码生成：一份 `.proto` 生成 Go / Java / Python / TypeScript 等 10+ 语言的类型安全代码
+- 强类型契约：字段类型、编号、嵌套关系在 `.proto` 中明确定义，编译期就能发现类型不匹配
+- 向前 / 向后兼容：通过字段编号机制，新增或废弃字段不破坏已部署的服务
+
+</Callout>
+
+<Callout>
+**局限**
+
+- **二进制不可读**：无法像 JSON 一样直接查看，调试需专用工具（`protoc --decode`、Buf Studio）
+- **需要编译步骤**：修改 `.proto` 后必须重新编译生成代码
+- **不适合浏览器直接消费**：前端通常用 JSON，protobuf 在浏览器端需额外的序列化/反序列化库
+
+</Callout>
+
+<Callout>
+**不只是 gRPC**
+
+protobuf 常与 [gRPC](/web-backend/api-communication/grpc) 搭配，但它是**独立的序列化格式**，也广泛用于：
+
+- 消息队列（Kafka、RabbitMQ 的消息体）
+- 数据存储（替代 JSON/XML 作为持久化格式）
+- 配置文件
+- 任何需要跨语言类型安全数据交换的场景
+
+</Callout>
+
+## 基础概念
+
+| 概念          | 一句话说明                                 |
+| ------------- | ------------------------------------------ |
+| `.proto` 文件 | 声明数据结构和服务接口的 IDL 文件          |
+| `syntax`      | 语法版本，现代项目统一用 `proto3`          |
+| `package`     | 命名空间，避免不同服务的类型冲突           |
+| `message`     | 消息类型，类似 struct / class              |
+| `service`     | RPC 服务定义（gRPC 用，纯数据场景可省略）  |
+| 字段编号      | 每个字段必须有唯一数字 ID，序列化时用      |
+| `protoc`      | 官方编译器，读取 `.proto` 生成目标语言代码 |
+
+## 基本语法
+
+### 最小示例
+
+```proto
+syntax = "proto3";
+
+package user.v1;
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  int32 age = 4;
+}
+```
+
+- `syntax = "proto3";` 必须第一行（或仅次于注释）
+- `package` 生成目标语言的命名空间
+- 每个字段 `类型 字段名 = 编号;`
+
+### 标量类型
+
+| proto3 类型         | Go              | TypeScript      | 说明                    |
+| ------------------- | --------------- | --------------- | ----------------------- |
+| `double`            | float64         | number          | 64 位浮点               |
+| `float`             | float32         | number          | 32 位浮点               |
+| `int32` / `int64`   | int32 / int64   | number / bigint | 变长编码                |
+| `uint32` / `uint64` | uint32 / uint64 | number / bigint | 无符号变长              |
+| `sint32` / `sint64` | —               | —               | Zigzag 编码，负数更紧凑 |
+| `bool`              | bool            | boolean         | —                       |
+| `string`            | string          | string          | UTF-8                   |
+| `bytes`             | []byte          | Uint8Array      | 任意字节序列            |
+
+<Callout>
+**要点：int32 vs sint32**
+
+`int32` 对负数用 10 字节变长编码，`sint32` 用 Zigzag 重新映射再变长，负数场景更小。**大多数情况下用 `int32` / `int64` 即可**，除非你确定字段经常是负数。
+
+</Callout>
+
+### 嵌套与枚举
+
+```proto
+message Order {
+  string id = 1;
+  OrderStatus status = 2;
+  repeated Item items = 3;
+  Address shipping_address = 4;
+
+  message Item {
+    string sku = 1;
+    int32 quantity = 2;
+  }
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING = 1;
+  ORDER_STATUS_PAID = 2;
+  ORDER_STATUS_SHIPPED = 3;
+}
+
+message Address {
+  string line1 = 1;
+  string city = 2;
+  string country = 3;
+}
+```
+
+- `repeated` 表示数组
+- 嵌套 `message` 作为内部类型
+- `enum` 的 **0 值必须是 `UNSPECIFIED`**（proto3 规定）
+
+### 字段编号规则
+
+字段编号是 protobuf 的**核心机制**，决定了向前/向后兼容：
+
+| 范围        | 用途                          |
+| ----------- | ----------------------------- |
+| 1–15        | 编码占 1 字节，给最常用字段   |
+| 16–2047     | 编码占 2 字节                 |
+| 19000–19999 | protobuf 内部保留，**不能用** |
+| 其他        | 可用到 2^29-1                 |
+
+<Callout>
+**要点：编号一旦使用，永不重用**
+
+- 删除字段时用 `reserved` 保留它的编号和名称，防止未来新字段不小心复用
+- 重用旧编号会导致：旧客户端按旧类型解析新数据，造成数据错乱
+
+```proto
+message User {
+  reserved 4, 7 to 9;
+  reserved "age", "old_email";
+
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  // 5、6 可以用
+  // 4、7、8、9 永远不能再用
+}
+```
+
+</Callout>
+
+### 默认值
+
+proto3 没有 `required`，所有字段都是可选的；未设置的字段使用**类型零值**：
+
+| 类型       | 默认值                                       |
+| ---------- | -------------------------------------------- |
+| 数值       | 0                                            |
+| `bool`     | false                                        |
+| `string`   | `""`                                         |
+| `bytes`    | `b""`                                        |
+| 消息       | 未设置（Go 中是 `nil`，TS 中是 `undefined`） |
+| `repeated` | 空数组                                       |
+| `enum`     | 第 0 个值（通常是 `*_UNSPECIFIED`）          |
+
+<Callout>
+**陷阱：零值无法区分"未设置"和"显式设置为 0"**
+
+如果业务要区分"没传"和"传了 0"，必须用包装类型（`google.protobuf.Int32Value` 等）或显式的 `optional` 关键字（proto3 新加）：
+
+```proto
+message Update {
+  optional int32 count = 1;  // 可以区分 unset / 0
+}
+```
+
+</Callout>
+
+## 兼容性规则
+
+protobuf 的关键卖点是**向前/向后兼容**。遵守规则：
+
+### 安全的变更
+
+- ✅ 新增字段（用新编号）
+- ✅ 删除字段（改用 `reserved`）
+- ✅ 重命名字段（编号不变即可，但会影响 JSON 字段名）
+- ✅ `singular` ↔ `repeated`（接收端自动处理）
+
+### 破坏性变更
+
+- ❌ 修改字段编号（全局数据错乱）
+- ❌ 修改字段类型（仅少数 wire 类型兼容组安全：`int32`/`int64`/`uint32`/`uint64`/`bool`/`enum` 之间可互转，但大数值从 `int64` 改回 `int32` 会**截断溢出**；`sint32`/`sint64` 自成一组不兼容前者）
+- ❌ 重用已删除字段的编号
+
+<Callout>
+**实践建议**
+
+- 所有 `.proto` 放在单独的 repo（或 monorepo 的共享目录）统一管理
+- 用 `buf breaking` 等工具自动检测破坏性变更
+- 新增字段总是用**下一个未用编号**，不要复用
+
+</Callout>
+
+## `service` 定义
+
+对 gRPC 来说，`service` 声明了 RPC 服务接口：
+
+```proto
+service UserService {
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc ListUsers(ListUsersRequest) returns (stream User);
+  rpc UpdateUser(stream UpdateUserRequest) returns (User);
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage);
+}
+```
+
+- `stream` 关键字标记流式（详见 [gRPC 四种通信模式](/web-backend/api-communication/grpc#四种通信模式)）
+- 每个方法必须有输入和输出消息类型，不能直接返回标量
+
+## 序列化格式（二进制布局）
+
+每个字段在 wire 格式中是 `(tag << 3) | wire_type` + value。核心认识：
+
+| Wire type | 代表             | 类型                          |
+| --------- | ---------------- | ----------------------------- |
+| 0         | Varint           | int32 / int64 / bool / enum   |
+| 1         | 64-bit           | double / fixed64              |
+| 2         | Length-delimited | string / bytes / 嵌套 message |
+| 5         | 32-bit           | float / fixed32               |
+
+**关键特性**：
+
+- 未设置的字段**完全不出现在 wire 格式里**，这就是为什么默认值没有开销
+- 未知字段（新版本加的）会被旧版本保留并透传，保证转发类服务的兼容
+
+## 工具链
+
+| 工具                                   | 用途                                                      |
+| -------------------------------------- | --------------------------------------------------------- |
+| `protoc`                               | 官方编译器                                                |
+| `buf`                                  | 现代 proto 工具链（lint、breaking change、远程 registry） |
+| `protoc-gen-go` / `protoc-gen-go-grpc` | Go 代码生成                                               |
+| `ts-proto` / `protobuf-ts`             | TypeScript 代码生成                                       |
+| `protoc --decode_raw`                  | 不依赖 `.proto` 解析二进制（调试用）                      |
+
+## 与 JSON 的对比
+
+| 维度          | protobuf          | JSON                   |
+| ------------- | ----------------- | ---------------------- |
+| 体积          | 二进制，3~10 倍小 | 文本，体积大           |
+| 解析速度      | 数倍于 JSON       | 慢                     |
+| 可读性        | 不可读            | 可读                   |
+| 类型系统      | 强类型 + codegen  | 弱类型                 |
+| 浏览器支持    | 需库              | 原生                   |
+| 向前/向后兼容 | 字段编号机制内建  | 需手动维护             |
+| 调试          | 需工具            | 浏览器 DevTools 直接看 |
+
+**使用建议**：
+
+- 服务间内部通信、高频数据传输 → protobuf
+- 前后端通信（浏览器）、调试友好 → JSON
+- 消息队列、持久化 → protobuf（如果上下游都能用）

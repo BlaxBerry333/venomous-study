@@ -1,0 +1,230 @@
+---
+title: 缓存与安全
+description: 客户端规范化缓存（Apollo Cache）、深度/复杂度限制、持久化查询
+category: web-backend
+tags:
+  - graphql
+  - cache
+  - security
+created: 2026-04-13
+order: 3
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+GraphQL 把"灵活查询"当优势，但这直接导致了两件 REST 时代不用担心的事：**HTTP 缓存失效**（所有请求走 `POST /graphql` 单端点）和**客户端可以构造任意查询**（需要服务端防护）。本文讲这两件事的通用解法。
+
+## 为什么 HTTP 缓存失效
+
+REST 的缓存建立在 HTTP 语义之上：
+
+- `GET /api/user/1` → 方法 + URL 作为缓存键
+- 浏览器、CDN、反向代理都能基于 `Cache-Control`、`ETag`、`Last-Modified` 自动缓存
+
+GraphQL：
+
+- 所有请求都是 `POST /graphql`
+- URL 完全相同，请求体（query 字符串 + variables）不同
+- **HTTP 层面无法区分，CDN/浏览器缓存全失效**
+
+<Callout>
+**结论**
+
+GraphQL 必须自己实现缓存。最常见方案是**客户端规范化缓存**（Apollo Client、Relay、urql 都内置）。
+
+</Callout>
+
+## 客户端缓存
+
+### 规范化（Normalization）
+
+把嵌套的响应数据拆成扁平的 id→entity 映射，类似前端版的数据库：
+
+```ts
+// 服务端响应
+{
+  user: {
+    id: "1",
+    name: "Alice",
+    posts: [
+      { id: "10", title: "Hello" },
+      { id: "11", title: "World" },
+    ],
+  }
+}
+
+// Apollo Cache 存储形态（Apollo Client 3+，参数用 JSON 序列化的 storeFieldName）
+{
+  "User:1": { id: "1", name: "Alice", posts: [Ref("Post:10"), Ref("Post:11")] },
+  "Post:10": { id: "10", title: "Hello" },
+  "Post:11": { id: "11", title: "World" },
+  "ROOT_QUERY": { "user({\"id\":\"1\"})": Ref("User:1") },
+}
+```
+
+**优势**：
+
+- 同一实体（`User:1`）在不同 Query 里出现，缓存只存一份
+- 任何一处更新（如 Mutation 改了 `User:1.name`），所有引用该实体的 Query 自动重渲染
+- 支持精细的缓存失效、乐观更新
+
+### Apollo Cache 的核心概念
+
+| 概念               | 说明                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| `cache.writeQuery` | 手动写入缓存，常用于乐观更新                                      |
+| `cache.readQuery`  | 读取缓存，不会触发网络请求                                        |
+| `cache.modify`     | 精确修改某个字段，触发关联 Query 重渲染                           |
+| `fetchPolicy`      | 请求策略：`cache-first` / `network-only` / `cache-and-network` 等 |
+| `typePolicies`     | 定义实体的 keyFields、字段合并策略等                              |
+
+### fetchPolicy
+
+| 策略                  | 行为                                       | 适用场景                  |
+| --------------------- | ------------------------------------------ | ------------------------- |
+| `cache-first`（默认） | 先读缓存，命中则不请求                     | 列表页、详情页            |
+| `cache-and-network`   | 同时读缓存（立即返回）和发请求（更新缓存） | 需要显示旧数据 + 后台刷新 |
+| `network-only`        | 跳过缓存，总是请求                         | 表单提交后刷新            |
+| `no-cache`            | 请求后不写缓存                             | 一次性数据                |
+| `cache-only`          | 只读缓存，不请求                           | 离线场景                  |
+
+### 缓存更新策略
+
+Mutation 后如何让列表页看到新数据：
+
+| 策略                 | 做法                               | 特点                            |
+| -------------------- | ---------------------------------- | ------------------------------- |
+| `refetchQueries`     | Mutation 后主动重发某些 Query      | 简单，但多一次网络请求          |
+| `update` 函数        | 手动写入/修改缓存                  | 零额外请求，但代码量大          |
+| `optimisticResponse` | 预先写入乐观数据，服务端响应后修正 | UI 立即更新，体验好，失败要回滚 |
+
+<Callout>
+**实践建议**
+
+- 默认用 `refetchQueries`，简单可靠
+- 列表 + 详情都受影响时考虑 `update` 精细控制
+- 交互敏感（点赞、收藏）用 `optimisticResponse` 提升体感
+
+</Callout>
+
+## 服务端安全限制
+
+GraphQL 客户端可以构造**任意深度**、**任意关联**、**任意别名**的查询。如果不加限制，攻击者可以发起一个递归查询把服务器拖垮：
+
+```graphql
+query {
+  user(id: "1") {
+    friends {
+      friends {
+        friends {
+          friends {
+            # ... 继续嵌套 50 层
+            name
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+需要在服务端做多层防护。
+
+### 深度限制
+
+限制查询的嵌套层级（通常 5~10 层足够）：
+
+```ts
+import depthLimit from "graphql-depth-limit";
+
+const server = new ApolloServer({
+  schema,
+  validationRules: [depthLimit(10)],
+});
+```
+
+超过深度直接拒绝，在**校验阶段**就中止，不进入执行。
+
+### 复杂度限制
+
+深度限制不够——宽而浅的查询也能把数据库打爆（如一次查 10000 个 user）。按字段打分累加：
+
+```ts
+import createComplexityRule, {
+  simpleEstimator,
+} from "graphql-query-complexity";
+
+const server = new ApolloServer({
+  schema,
+  validationRules: [
+    createComplexityRule({
+      maximumComplexity: 1000,
+      estimators: [simpleEstimator({ defaultComplexity: 1 })],
+      onComplete: (complexity) => {
+        console.log("Query complexity:", complexity);
+      },
+    }),
+  ],
+});
+```
+
+<Callout>
+**要点**
+
+- 给每个字段/类型打分，累加后超过阈值拒绝
+- 通过 `@complexity` 指令或字段配置给数组字段按 `first/limit` 参数估算
+- 需要在 Schema 里强制分页参数（禁止无上限的 `posts: [Post!]!`）
+- `graphql-validation-complexity`（老项目常见）已停止维护，新项目用仍活跃的 [graphql-query-complexity](https://github.com/slicknode/graphql-query-complexity)
+
+</Callout>
+
+### 持久化查询（Persisted Queries）
+
+思路：客户端不再发完整 Query 字符串，而是发**预注册的 Query ID / Hash**。
+
+```txt
+普通:          POST /graphql   { query: "query { user { name } }", variables: {...} }
+持久化:        POST /graphql   { queryId: "a1b2c3...", variables: {...} }
+```
+
+**好处**：
+
+- 只允许白名单内的 Query 执行（天然防止任意查询攻击）
+- 请求体变小，可走 CDN / GET 缓存
+- Apollo 有 `Automatic Persisted Queries (APQ)` 方案自动协商
+
+### 其他必做
+
+| 措施                       | 说明                                    |
+| -------------------------- | --------------------------------------- |
+| 认证与授权                 | Resolver 或指令层校验 `ctx.user` / 角色 |
+| 频率限制                   | 按 IP / 用户限制请求频率，防刷          |
+| Query 超时                 | 单个请求执行超过 N 秒强制中止           |
+| 禁用 Introspection（生产） | 关闭 Schema 反射，避免攻击者探测 API    |
+| 错误信息最小化（生产）     | 不把数据库错误栈直接返回客户端          |
+
+### 部分成功
+
+GraphQL 的响应格式允许**部分字段成功、部分字段失败**：
+
+```json
+{
+  "data": { "user": { "name": "Alice", "email": null } },
+  "errors": [{ "message": "Permission denied", "path": ["user", "email"] }]
+}
+```
+
+客户端需要同时检查 `data` 和 `errors`，不能只看 HTTP 状态码（始终 200）。
+
+<Callout>
+**陷阱**
+
+- 权限错误只返回 `email: null` + `errors` 条目，不会让整个 Query 失败
+- 客户端代码要有健壮的 "data 存在但某字段缺失" 处理路径
+- 这也是 GraphQL 错误模型比 [tRPC 错误模型](/web-backend/api-communication/trpc/error-handling) 复杂的原因
+
+</Callout>
+
+回到 [GraphQL 总览](/web-backend/api-communication/graphql)

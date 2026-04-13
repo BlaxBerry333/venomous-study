@@ -1,0 +1,194 @@
+---
+title: N+1 问题与 DataLoader
+description: GraphQL 嵌套查询的 N+1 陷阱、DataLoader 的批量合并与缓存机制
+category: web-backend
+tags:
+  - graphql
+  - performance
+  - dataloader
+created: 2026-04-13
+order: 2
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+N+1 是 GraphQL 嵌套查询的最典型性能陷阱：**查 N 条记录时，额外又发了 N 次关联查询**。
+
+DataLoader 是官方推荐的解法——**请求内批量合并 + 缓存**。
+
+## N+1 问题是什么
+
+看一个常见查询：
+
+```graphql
+query {
+  users {
+    id
+    name
+    posts {
+      title
+    }
+  }
+}
+```
+
+对应的 Resolver：
+
+```ts
+const resolvers = {
+  Query: {
+    users: () => db.user.findMany(),
+  },
+  User: {
+    posts: (parent) => db.post.findMany({ where: { authorId: parent.id } }),
+  },
+};
+```
+
+执行顺序：
+
+```txt
+① db.user.findMany()              → 返回 100 个 User
+② 对每个 User 执行 User.posts：
+   db.post.findMany({ authorId: 1 })
+   db.post.findMany({ authorId: 2 })
+   db.post.findMany({ authorId: 3 })
+   ...（共 100 次）
+```
+
+**总计 1 + 100 = 101 次数据库查询**（根查询 1 次 + 子查询 100 次），这就是 N+1。
+
+<Callout>
+**为什么 GraphQL 特别容易踩**
+
+REST 里 `/users?include=posts` 会写一次 JOIN 或 `WHERE authorId IN (...)`，Controller 层自己控制。
+
+GraphQL 的 resolver 是**按字段级别**执行的，每个 `User.posts` 字段都独立调用一次——运行时不知道你在"一批里取 100 个用户的 posts"，它只知道"当前这个 User 要拿 posts"。
+
+</Callout>
+
+## DataLoader 的解法
+
+DataLoader 做两件事：
+
+1. **批量合并**：在同一次请求的同一个"事件循环 tick"里，把多次 `load(id)` 调用攒起来，一次性调用 `batchFn(ids)`
+2. **请求内缓存**：同一个 id 再次 `load` 时直接命中缓存，不重复触发
+
+```ts
+import DataLoader from "dataloader";
+
+// 批函数：一次接收一组 authorId，返回同样顺序的 Post[][]
+const postsByAuthorLoader = new DataLoader(
+  async (authorIds: readonly string[]) => {
+    const posts = await db.post.findMany({
+      where: { authorId: { in: [...authorIds] } },
+    });
+    // 必须按 authorIds 的顺序返回，每个元素是该 authorId 对应的 posts 数组
+    return authorIds.map((id) => posts.filter((p) => p.authorId === id));
+  },
+);
+```
+
+Resolver 改为使用 loader：
+
+```ts
+const resolvers = {
+  User: {
+    posts: (parent, _, ctx) => ctx.postsByAuthorLoader.load(parent.id),
+  },
+};
+```
+
+执行流程变成：
+
+```txt
+① db.user.findMany()                → 返回 100 个 User
+② 每个 User 调用 loader.load(id)    → 攒起来不立即执行
+③ 事件循环 tick 结束              → 一次性调用 batchFn([1,2,3,...,100])
+                                    → 一次 SQL：WHERE authorId IN (1..100)
+④ 结果按 id 分组回填给各个 resolver
+```
+
+**总计 1 + 1 = 2 次查询**（根查询 1 次 + 批量加载 1 次）。
+
+## 为什么 "per-request"
+
+DataLoader 实例**必须每次请求新建**，不能做全局单例：
+
+```ts
+// 错误：全局单例会跨请求泄漏缓存、跨用户共享数据
+const globalLoader = new DataLoader(batchFn);
+
+// 正确：在 context 中为每次请求创建
+const server = new ApolloServer({
+  schema,
+  context: ({ req }) => ({
+    user: getUser(req),
+    postsByAuthorLoader: new DataLoader(batchFn),
+  }),
+});
+```
+
+<Callout>
+**要点**
+
+- 全局 loader 的缓存跨请求污染：用户 A 看到的数据可能因为用户 B 的查询被缓存了而读到过期结果
+- 权限敏感场景更危险：不同用户可见的数据集不同，共享缓存会泄漏
+- 每次请求重新创建，生命周期绑定到 `context`，请求结束自动释放
+
+</Callout>
+
+## 批函数（batchFn）的契约
+
+DataLoader 对 batchFn 有严格要求：
+
+1. **输入**：`readonly Key[]`（这次 tick 攒到的所有 key）
+2. **输出**：`Promise<(Value | Error)[]>`，数组长度必须和输入 keys **一致**，且顺序一一对应
+3. **缺失项**：某个 key 查不到时，对应位置返回 `null` / `undefined` 或一个 `Error` 实例（不要直接 throw，否则整批失败）
+
+```ts
+const userLoader = new DataLoader(async (ids: readonly string[]) => {
+  const users = await db.user.findMany({ where: { id: { in: [...ids] } } });
+  const byId = new Map(users.map((u) => [u.id, u]));
+  return ids.map((id) => byId.get(id) ?? new Error(`User ${id} not found`));
+});
+```
+
+<Callout>
+**陷阱：顺序不匹配**
+
+数据库返回的顺序通常不等于 `ids` 的顺序。必须显式按 key 重排，否则 DataLoader 会把错误的数据分发给 resolver。
+
+</Callout>
+
+## 多对多 / 一对多
+
+DataLoader 默认假设 **key → 单个 value**（如 `id → User`）。
+
+对于"一个 authorId → 多个 Post" 这样的一对多关系，batchFn 的返回值是 `Post[][]`（每个位置是一个数组）。
+
+```ts
+const postsByAuthorLoader = new DataLoader<string, Post[]>(
+  async (authorIds) => {
+    const posts = await db.post.findMany({
+      where: { authorId: { in: [...authorIds] } },
+    });
+    return authorIds.map((id) => posts.filter((p) => p.authorId === id));
+  },
+);
+```
+
+## 什么时候不需要 DataLoader
+
+| 场景                                          | 是否需要 |
+| --------------------------------------------- | -------- |
+| 嵌套查询（如 `users { posts { comments } }`） | 必须     |
+| 单次根查询不涉及嵌套                          | 不需要   |
+| 已经在单个 resolver 里一次性 JOIN 完所有字段  | 不需要   |
+| 非数据库的纯计算字段                          | 不需要   |
+
+**判断原则**：resolver 里有没有出现"对每个 parent 单独查一次外部数据源"的模式，有就用 loader。
+
+回到 [GraphQL 总览](/web-backend/api-communication/graphql)

@@ -1,0 +1,343 @@
+---
+title: REST
+description: 基于 HTTP 语义的资源化 API 风格，最成熟的公开 API 方案
+category: web-backend
+tags:
+  - rest
+  - http
+  - api
+created: 2026-04-13
+order: 0
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+> Representational State Transfer
+
+REST 是一种**基于 HTTP 语义**的 API 设计风格——把系统抽象为**资源**，用 URL 定位资源、用 HTTP 方法表示操作、用 HTTP 状态码表示结果。是公开 API 的默认选择，生态和基础设施最成熟。
+
+<Callout>
+**特点**
+
+- 用 URL + HTTP 方法即可定义接口，客户端用任何 HTTP 库都能调用
+- 天然兼容 HTTP 缓存（`Cache-Control` / `ETag`）和 CDN
+- 浏览器、日志、监控、防火墙、代理全链路原生支持
+- 无状态，任意实例可处理任意请求，水平扩展简单
+
+</Callout>
+
+<Callout>
+**局限**
+
+- **没有内置类型系统**：需要 OpenAPI + codegen 才能获得类型安全
+- **Over-fetching / Under-fetching**：服务端决定返回结构，客户端可能拿到多余字段或需要发多次请求
+- **API 演进需要版本号**：新增字段一般安全，删改字段需 `/v2/` 或 Header 切换
+- **RPC 风味操作难以表达**：`结算购物车`、`发送验证码` 这类动词操作硬塞进资源模型会很别扭
+
+</Callout>
+
+<Callout>
+**适用场景**
+
+- 对外公开 API、第三方集成（GitHub v3、Stripe 等大多数公共 API）
+- 简单 CRUD、资源模型清晰的业务
+- 需要 HTTP 缓存 / CDN / 标准监控 / 代理链路兼容
+- 多语言客户端（没有共享类型环境）
+
+</Callout>
+
+## REST 的五个层次
+
+Leonard Richardson 提出的成熟度模型（RMM）：
+
+| Level | 特征                                       | 状态                           |
+| ----- | ------------------------------------------ | ------------------------------ |
+| 0     | 单一端点、单一方法（`POST /api` 全部操作） | 伪 REST                        |
+| 1     | 资源分离（`/users`、`/orders`）            | 普通                           |
+| 2     | 正确使用 HTTP 方法 + 状态码                | **业界大多数「REST」停在这里** |
+| 3     | HATEOAS（响应里带下一步可做的操作链接）    | 少见，成本高                   |
+
+<Callout>
+**要点**
+
+业界说的 REST 几乎都是 Level 2。追求 Level 3 的投入产出比在多数项目里不划算，知道它存在即可。
+
+</Callout>
+
+## 资源与 URL
+
+核心思想：**URL 是名词（资源），HTTP 方法是动词**。
+
+```txt
+✅ GET    /users              获取用户列表
+✅ GET    /users/1            获取单个用户
+✅ POST   /users              创建用户
+✅ PUT    /users/1            整体替换用户
+✅ PATCH  /users/1            局部更新
+✅ DELETE /users/1            删除用户
+✅ GET    /users/1/orders     用户的订单（嵌套资源）
+
+❌ GET  /getUserList          动词塞 URL
+❌ POST /deleteUser?id=1      POST 当万能方法
+```
+
+<Callout>
+**嵌套深度建议不超过 2 层**
+
+- `/users/1/orders` ✅
+- `/users/1/orders/9/items` ⚠️ 可以，但开始笨重
+- `/users/1/orders/9/items/5/comments` ❌ 改成 `/items/5/comments`
+
+深嵌套 URL 会让缓存键、权限校验、路由定义都变复杂。
+
+</Callout>
+
+## HTTP 方法的语义
+
+| 方法     | 幂等 | 安全 | 典型用途                              |
+| -------- | ---- | ---- | ------------------------------------- |
+| `GET`    | ✅   | ✅   | 读取资源，不改变状态                  |
+| `HEAD`   | ✅   | ✅   | 只取响应头（检查是否存在、获取 ETag） |
+| `POST`   | ❌   | ❌   | 创建资源、非幂等操作                  |
+| `PUT`    | ✅   | ❌   | 整体替换资源（同样请求重发结果相同）  |
+| `PATCH`  | ⚠️   | ❌   | 局部更新（是否幂等取决于实现）        |
+| `DELETE` | ✅   | ❌   | 删除资源（重复 DELETE 的结果相同）    |
+
+<Callout>
+**幂等与安全**
+
+- **安全（Safe）**：不改变服务端状态，可任意重发。只有 `GET` / `HEAD` / `OPTIONS`
+- **幂等（Idempotent）**：多次执行效果等同于一次。`GET` / `PUT` / `DELETE` 幂等，`POST` 不幂等
+- 幂等是重试的基础：网络超时后客户端重试 `PUT` 安全，重试 `POST` 要防重复提交（用 Idempotency-Key 头）
+
+</Callout>
+
+## 状态码的常见用法
+
+用**有语义的状态码**，让代理、监控、客户端能正确理解响应。
+
+| 类别           | 典型                        | 含义                                      |
+| -------------- | --------------------------- | ----------------------------------------- |
+| 2xx 成功       | `200 OK`                    | 通用成功                                  |
+|                | `201 Created`               | 创建资源成功（`Location` 头带新资源 URL） |
+|                | `204 No Content`            | 成功但无响应体（DELETE、PUT 后常用）      |
+| 3xx 重定向     | `301 Moved Permanently`     | 永久重定向                                |
+|                | `304 Not Modified`          | 缓存命中（配合 ETag / Last-Modified）     |
+| 4xx 客户端错误 | `400 Bad Request`           | 参数错误                                  |
+|                | `401 Unauthorized`          | 未认证                                    |
+|                | `403 Forbidden`             | 已认证但无权限                            |
+|                | `404 Not Found`             | 资源不存在                                |
+|                | `409 Conflict`              | 资源冲突（重复创建、版本冲突）            |
+|                | `422 Unprocessable Entity`  | 参数格式对但业务规则不通过                |
+|                | `429 Too Many Requests`     | 频率限制                                  |
+| 5xx 服务端错误 | `500 Internal Server Error` | 未捕获异常                                |
+|                | `502 Bad Gateway`           | 上游异常                                  |
+|                | `503 Service Unavailable`   | 服务不可用（维护、过载）                  |
+|                | `504 Gateway Timeout`       | 上游超时                                  |
+
+<Callout>
+**反模式：永远 200**
+
+部分项目把业务错误全塞进响应体 `{ code: -1, message: "..." }`，HTTP 层永远 200。这会让：
+
+- HTTP 缓存错误地缓存失败响应
+- 监控无法按状态码统计错误率
+- 客户端 / SDK 不能直接用标准错误处理
+
+老接口为了历史兼容可以保留，新接口应该用正常状态码。
+
+</Callout>
+
+## 分页、排序、过滤
+
+URL 的 query string 是事实标准。
+
+```txt
+GET /users?page=2&pageSize=20                 分页
+GET /users?sort=-createdAt                    排序（前缀 - 表示降序）
+GET /users?filter[status]=active              过滤
+GET /users?fields=id,name                     字段筛选（可选）
+GET /users?cursor=xxx&limit=20                游标分页（大数据集）
+```
+
+<Callout>
+**分页风格**
+
+- **偏移分页**（`page + pageSize`）：简单、可跳页，但深翻页慢、新增数据会错位
+- **游标分页**（`cursor + limit`）：稳定、高效，但不能跳页
+
+大数据集 / 流式展示用游标分页，后台表格用偏移分页。
+
+</Callout>
+
+## 缓存
+
+REST 的**核心优势**，GraphQL / tRPC / gRPC 都没有的能力。
+
+### 客户端 / CDN 缓存
+
+```http
+Cache-Control: public, max-age=3600           共享缓存可存 1 小时
+Cache-Control: private, max-age=60            仅浏览器缓存
+Cache-Control: no-store                       禁止任何缓存
+```
+
+### 条件请求（ETag / Last-Modified）
+
+```http
+响应：
+  ETag: "abc123"
+  Last-Modified: Sat, 12 Apr 2025 10:00:00 GMT
+
+下次请求：
+  If-None-Match: "abc123"
+  If-Modified-Since: Sat, 12 Apr 2025 10:00:00 GMT
+
+→ 未变化时服务端返回 304 Not Modified（无响应体，省带宽）
+```
+
+<Callout>
+**要点**
+
+- `Cache-Control` 控制**多久内不发请求**
+- `ETag` / `Last-Modified` 控制**发了请求但内容没变时省带宽**
+- 两者常配合使用：`max-age=60` + `ETag`
+
+</Callout>
+
+## 类型安全：OpenAPI
+
+REST 本身没有类型系统，需要用 OpenAPI（Swagger）弥补。
+
+```yaml
+paths:
+  /users/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+```
+
+基于 OpenAPI Schema 可以：
+
+- **codegen**：`openapi-typescript` / `openapi-generator` 生成前后端类型
+- **文档**：Swagger UI / Redoc 自动渲染交互式 API 文档
+- **校验**：`ajv` 等库运行时校验请求 / 响应
+
+<Callout>
+**代价**
+
+OpenAPI 需要手动维护（或用框架自动从代码生成，如 NestJS `@nestjs/swagger`、FastAPI、Hono RPC）。比 [tRPC](/web-backend/api-communication/trpc) 的"零 codegen 自动推导"和 [GraphQL](/web-backend/api-communication/graphql) 的"Schema 即文档"多一步。
+
+</Callout>
+
+## CORS
+
+浏览器对**跨源**请求有同源策略，REST 作为公开 API 必须配置 CORS 才能被第三方 Web 客户端调用。
+
+| 场景                                | 关键响应头                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 简单请求（GET / 简单 POST）         | `Access-Control-Allow-Origin`                                                                                      |
+| 预检请求（PUT / DELETE / 自定义头） | 浏览器先发 `OPTIONS`，服务端用 `Access-Control-Allow-Methods` / `Allow-Headers` 回应                               |
+| 带 Cookie / Authorization           | 客户端 `credentials: "include"`，服务端 `Access-Control-Allow-Credentials: true`，且 `Allow-Origin` **不能是 `*`** |
+
+<Callout>
+**陷阱**
+
+- 生产环境**不要用 `Access-Control-Allow-Origin: *`**，至少按域名白名单
+- 带凭证的请求用 `*` 浏览器直接拒绝
+- 预检请求频繁时用 `Access-Control-Max-Age` 缓存（秒），减少 OPTIONS 开销
+- 不是所有跨源错误都是 CORS 问题：网络断开、404 也会在 DevTools 里显示"CORS error"，先看服务端日志确认请求是否到达
+
+</Callout>
+
+## 错误响应建议
+
+统一错误结构方便客户端处理。RFC 7807 的 Problem Details 是常见选择：
+
+```json
+{
+  "type": "https://example.com/errors/insufficient-balance",
+  "title": "Insufficient balance",
+  "status": 422,
+  "detail": "Your balance is 10 but 50 is required.",
+  "instance": "/orders/9"
+}
+```
+
+自研格式至少包含：HTTP 状态码（在响应头里）、业务 code（可选）、message、traceId（方便排查）。
+
+## 与其他方案的对比
+
+详细对比见：
+
+- [REST vs GraphQL](/web-backend/api-communication/graphql#graphql-vs-rest)
+- [REST vs tRPC](/web-backend/api-communication/trpc)（tRPC 特点部分）
+- [REST vs gRPC](/web-backend/api-communication/grpc#与其他方案的对比)
+
+选型概览：
+
+| 场景                       | 推荐                                              |
+| -------------------------- | ------------------------------------------------- |
+| 对外 API、第三方集成       | **REST**                                          |
+| 多客户端共用 API、灵活查询 | [GraphQL](/web-backend/api-communication/graphql) |
+| TS 全栈、同团队 monorepo   | [tRPC](/web-backend/api-communication/trpc)       |
+| 微服务内部、多语言、高性能 | [gRPC](/web-backend/api-communication/grpc)       |
+
+## 最小示例（Node.js + Express）
+
+```js
+import express from "express";
+
+const app = express();
+app.use(express.json());
+
+const users = new Map();
+
+app.get("/users", (req, res) => {
+  res.json([...users.values()]);
+});
+
+app.get("/users/:id", (req, res) => {
+  const user = users.get(req.params.id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  res.json(user);
+});
+
+app.post("/users", (req, res) => {
+  const id = crypto.randomUUID();
+  const user = { id, ...req.body };
+  users.set(id, user);
+  res.status(201).location(`/users/${id}`).json(user);
+});
+
+app.delete("/users/:id", (req, res) => {
+  if (!users.delete(req.params.id)) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  res.status(204).end();
+});
+
+app.listen(3000);
+```
+
+回到 [API 通信总览](/web-backend/api-communication)

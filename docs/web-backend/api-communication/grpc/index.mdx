@@ -1,0 +1,310 @@
+---
+title: gRPC
+description: 基于 HTTP/2 + Protocol Buffers 的高性能 RPC 框架
+category: web-backend
+tags:
+  - grpc
+  - rpc
+  - http2
+created: 2026-04-13
+order: 0
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+> Google Remote Procedure Call
+
+gRPC 是 Google 开源的高性能 RPC 框架，基于 HTTP/2 + [Protocol Buffers](/web-backend/api-communication/protobuf) 实现跨语言的服务间通信。
+
+<Callout>
+**特点**
+
+- 基于 HTTP/2：多路复用、头部压缩、双向流，单连接并行处理大量请求
+- 使用 protobuf 作为默认序列化格式，体积比 JSON 小 3~10 倍，解析快数倍
+- 强类型契约：通过 `.proto` 文件定义服务接口，自动生成多语言代码
+- 原生支持四种通信模式：Unary、Server Streaming、Client Streaming、Bidirectional Streaming
+- 多语言原生支持：官方或官方维护的绑定覆盖 Go、Java、C++、Python、C#、Ruby、Node.js、PHP、Dart、Kotlin、Swift、Objective-C，Rust 有活跃社区实现
+
+</Callout>
+
+<Callout>
+**局限**
+
+- **浏览器不能直接调用**：浏览器不支持 HTTP/2 Trailer，需要 gRPC-Web 代理（Envoy 等），且 gRPC-Web 不支持 Client Streaming 和 Bidirectional Streaming
+- **protobuf 是二进制**：不可读，调试需专用工具（`grpcurl`、Buf Studio）
+- **不能利用 HTTP 缓存 / CDN**：所有请求走 HTTP/2 POST，无 GET 缓存机制
+- **学习曲线高**：需学 protobuf 语法、代码生成流程、流式通信模型
+- **不适合对外公开 API**：第三方客户端集成成本高于 REST
+
+</Callout>
+
+<Callout>
+**适用场景**
+
+- 微服务间内部通信（Kubernetes 集群内服务互调）
+- 高吞吐 / 低延迟（交易系统、推荐引擎）
+- 多语言服务互调（Go 服务调 Java 服务）
+- 流式传输（实时数据管道、长连接 RPC）
+
+</Callout>
+
+## REST vs gRPC 的传输形态
+
+```txt
+┏━━━━━━━━━━━━ REST API ━━━━━━━━━━━━┓
+┃                                  ┃
+┃  Client ━━ JSON ━━▶ Server       ┃  HTTP/1.1，文本格式，可读
+┃                                  ┃  每个请求独立连接
+┃  POST /api/users                 ┃
+┃  { "name": "Alice" }             ┃
+┃                                  ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+┏━━━━━━━━━━━━━ gRPC ━━━━━━━━━━━━━━━┓
+┃                                  ┃
+┃  Client ━━ protobuf ━━▶ Server   ┃  HTTP/2，二进制，不可读
+┃                                  ┃  单连接多路复用
+┃  UserService.CreateUser(...)     ┃  支持四种流式模式
+┃                                  ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+```
+
+## 基础概念
+
+| 概念          | 一句话说明                                                                             |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `.proto` 文件 | 定义服务接口和消息类型的 IDL，详见 [Protobuf](/web-backend/api-communication/protobuf) |
+| Service       | 一组 RPC 方法的集合（类似 interface）                                                  |
+| Method        | 单个 RPC 方法，有 Unary / Streaming 四种模式                                           |
+| Stub          | 由 codegen 生成的客户端代理，封装网络调用为普通方法                                    |
+| HTTP/2        | 底层传输协议，提供多路复用、双向流、头部压缩                                           |
+| Metadata      | 类似 HTTP Header 的键值对，附在请求/响应上（鉴权、追踪）                               |
+
+## 四种通信模式
+
+gRPC 通过 `.proto` 中的 `stream` 关键字决定每个方法的模式：
+
+### Unary（一元）
+
+最常见的"请求-响应"，类似 REST。
+
+```proto
+rpc GetUser(GetUserRequest) returns (User);
+```
+
+```txt
+Client ──── request ────▶ Server
+Client ◀─── response ─── Server
+```
+
+### Server Streaming（服务端流）
+
+客户端发一次，服务端持续推送多个响应。
+
+```proto
+rpc Subscribe(SubscribeRequest) returns (stream Event);
+```
+
+```txt
+Client ──── request ────▶ Server
+Client ◀── response 1 ── Server
+Client ◀── response 2 ── Server
+Client ◀── response 3 ── Server
+...
+```
+
+适用：服务端推送（通知、实时数据订阅），类似 SSE 但走 HTTP/2。
+
+### Client Streaming（客户端流）
+
+客户端持续发多个请求，服务端最后返回一次响应。
+
+```proto
+rpc UploadLog(stream LogEntry) returns (UploadSummary);
+```
+
+```txt
+Client ──── request 1 ──▶ Server
+Client ──── request 2 ──▶ Server
+Client ──── request 3 ──▶ Server
+Client ◀── response ──── Server
+```
+
+适用：文件分块上传、批量日志上报。
+
+### Bidirectional Streaming（双向流）
+
+客户端和服务端同时持续互发消息，顺序独立。
+
+```proto
+rpc Chat(stream ChatMessage) returns (stream ChatMessage);
+```
+
+```txt
+Client ◀──▶ request / response ◀──▶ Server
+          （任意顺序、任意数量）
+```
+
+适用：聊天、实时协同、游戏状态同步。
+
+<Callout>
+**陷阱：浏览器的限制**
+
+- gRPC-Web 只支持 **Unary** 和 **Server Streaming**
+- 不支持 **Client Streaming** 和 **Bidirectional Streaming**
+- 浏览器要双向流场景，得用 WebSocket 替代或配合 gRPC-Web 的单向流
+
+</Callout>
+
+## HTTP/2 的底层优势
+
+gRPC 选 HTTP/2 而不是 HTTP/1.1 的核心原因：
+
+| 能力       | HTTP/1.1                        | HTTP/2                 |
+| ---------- | ------------------------------- | ---------------------- |
+| 多路复用   | 不支持（Head-of-line blocking） | 单连接并行处理大量请求 |
+| 头部压缩   | 每次完整发送                    | HPACK 压缩，减少重复   |
+| 服务端推送 | 不支持                          | 支持                   |
+| 二进制帧   | 文本                            | 二进制，解析更快       |
+| 流式传输   | 不友好                          | 原生支持               |
+
+## 基本使用
+
+### 1. 写 `.proto`
+
+```proto
+syntax = "proto3";
+
+package user.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc ListUsers(ListUsersRequest) returns (stream User);
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message ListUsersRequest {
+  int32 page_size = 1;
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+```
+
+详见 [Protobuf](/web-backend/api-communication/protobuf)。
+
+### 2. codegen 生成多语言代码
+
+```zsh
+# Go
+% protoc --go_out=. --go-grpc_out=. user.proto
+
+# TypeScript（Node.js 服务端）
+% protoc --ts_out=. user.proto
+```
+
+生成的文件包含消息类型定义和 Service 的 Stub 代码。
+
+### 3. 服务端实现
+
+```ts
+import { Server, ServerCredentials } from "@grpc/grpc-js";
+import { UserServiceService, UserServiceServer } from "./gen/user_grpc_pb";
+
+const userServer: UserServiceServer = {
+  getUser: (call, callback) => {
+    const id = call.request.getId();
+    const user = db.findUser(id);
+    callback(null, user);
+  },
+  listUsers: (call) => {
+    for (const u of db.listUsers()) {
+      call.write(u);
+    }
+    call.end();
+  },
+};
+
+const server = new Server();
+server.addService(UserServiceService, userServer);
+server.bindAsync("0.0.0.0:50051", ServerCredentials.createInsecure(), () => {
+  server.start();
+});
+```
+
+### 4. 客户端调用
+
+```ts
+import { credentials } from "@grpc/grpc-js";
+import { UserServiceClient } from "./gen/user_grpc_pb";
+import { GetUserRequest } from "./gen/user_pb";
+
+const client = new UserServiceClient(
+  "localhost:50051",
+  credentials.createInsecure(),
+);
+
+const req = new GetUserRequest();
+req.setId("1");
+
+client.getUser(req, (err, user) => {
+  if (err) throw err;
+  console.log(user.getName());
+});
+```
+
+## 浏览器方案：gRPC-Web 与 ConnectRPC
+
+gRPC 原生无法跑在浏览器（浏览器 `fetch` / `XHR` 拿不到 HTTP/2 trailer），两种主流方案：
+
+| 方案                                                  | 说明                                                                                                                                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **gRPC-Web**                                          | Google 官方方案，需要 Envoy / `grpcwebproxy` 代理把浏览器的 `application/grpc-web` 请求翻译成原生 gRPC。只支持 Unary 和 Server Streaming                                  |
+| **[ConnectRPC](https://connectrpc.com/)**（Buf 主推） | 同一份 `.proto` 同时对外暴露三种协议：原生 gRPC、gRPC-Web、Connect（纯 HTTP/1.1 + JSON/Protobuf）；浏览器可直连无需代理；Go / Node.js / Web / Swift / Kotlin SDK 覆盖齐全 |
+
+<Callout>
+**趋势**
+
+新项目要在浏览器和服务间使用 gRPC 风格 API 时，**ConnectRPC 正在成为 gRPC-Web 的主流替代**——不需要 Envoy，调试能像 REST 一样 curl，同时保留 protobuf 的类型安全和 schema 演进能力。
+
+</Callout>
+
+## 调试工具
+
+gRPC 的二进制格式不能用浏览器 DevTools 直接看，常用工具：
+
+| 工具                      | 场景                            |
+| ------------------------- | ------------------------------- |
+| `grpcurl`                 | 命令行调用（类似 curl）         |
+| Buf Studio / Postman gRPC | 图形化测试                      |
+| BloomRPC（已归档）        | 老项目可能还在用                |
+| Envoy Proxy               | gRPC-Web 代理，同时承担调试抓包 |
+
+## 与其他方案的对比
+
+| 维度     | gRPC                     | REST                | GraphQL          | tRPC                   |
+| -------- | ------------------------ | ------------------- | ---------------- | ---------------------- |
+| 协议     | HTTP/2                   | HTTP/1.1+           | HTTP/1.1+        | HTTP/1.1+              |
+| 序列化   | protobuf（二进制）       | JSON（文本）        | JSON（文本）     | JSON + SuperJSON       |
+| 类型系统 | 多语言 codegen           | 手动或 OpenAPI      | Schema + codegen | TS 编译器推导          |
+| 浏览器   | 需 gRPC-Web 代理         | 原生                | 原生             | 原生                   |
+| 流式     | 原生四种模式             | SSE / WebSocket     | Subscription     | subscription procedure |
+| 适用     | 微服务间、多语言、高性能 | 公开 API、简单 CRUD | 多客户端灵活查询 | TS 全栈                |
+
+<Callout>
+**选型判断**
+
+- 需要浏览器直接调用 → **不要选 gRPC**，用 REST / GraphQL / tRPC
+- 微服务之间 + 多语言 + 流式 → gRPC 几乎是唯一选择
+- 只是想要"类型安全 + 高性能"，但运行在 TS 全栈 → tRPC 更省事
+
+</Callout>

@@ -1,0 +1,210 @@
+---
+title: tRPC 错误处理
+description: TRPCError、错误码、客户端捕获、与 GraphQL 错误模型对比
+category: web-backend
+tags:
+  - trpc
+  - error
+created: 2026-04-13
+order: 2
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+tRPC 的错误处理直接映射回了 HTTP 模型：**状态码是真的 HTTP 状态码，错误就是错误，不存在"部分成功"**。这和 GraphQL 始终 200 + `errors` 字段的模式完全不同。
+
+## 与 GraphQL 的对比
+
+| 维度        | tRPC                                 | GraphQL                              |
+| ----------- | ------------------------------------ | ------------------------------------ |
+| HTTP 状态码 | 正常状态码（400、401、404、500）     | 始终 200                             |
+| 错误位置    | HTTP 响应体的错误对象                | 响应体的 `errors` 字段               |
+| 部分成功    | 不存在（procedure 要么成功要么失败） | 存在（多字段查询时部分失败部分成功） |
+| 类型安全    | 错误码有 TypeScript 类型约束         | 错误码是自定义字符串                 |
+
+<Callout>
+**要点**
+
+tRPC 的错误就是正常的 HTTP 错误，前端按 HTTP 状态码处理就行，不需要像 GraphQL 那样额外解析 `errors` 字段。
+
+</Callout>
+
+## 服务端抛出错误
+
+在 procedure 中通过 `TRPCError` 抛出：
+
+```ts
+import { TRPCError } from "@trpc/server";
+
+const getUserById = publicProcedure
+  .input(z.object({ id: z.string() }))
+  .query(async ({ ctx, input }) => {
+    const user = await ctx.db.user.findUnique({ where: { id: input.id } });
+    if (!user) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "User not found",
+      });
+    }
+    return user;
+  });
+```
+
+带原始错误的抛出（便于日志追踪）：
+
+```ts
+const deleteUser = publicProcedure
+  .input(z.object({ id: z.string() }))
+  .mutation(async ({ ctx, input }) => {
+    try {
+      await ctx.db.user.delete({ where: { id: input.id } });
+    } catch (cause) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to delete user",
+        cause,
+      });
+    }
+  });
+```
+
+## 错误码与 HTTP 状态码
+
+tRPC 预定义了一组错误码，一一对应到 HTTP 状态码：
+
+| `code`                  | HTTP 状态 | 含义                               |
+| ----------------------- | --------- | ---------------------------------- |
+| `PARSE_ERROR`           | 400       | 请求体无法解析                     |
+| `BAD_REQUEST`           | 400       | 参数非法（Zod 校验失败自动抛出）   |
+| `UNAUTHORIZED`          | 401       | 未登录                             |
+| `FORBIDDEN`             | 403       | 已登录但无权限                     |
+| `NOT_FOUND`             | 404       | 资源不存在                         |
+| `METHOD_NOT_SUPPORTED`  | 405       | 不支持的 HTTP 方法                 |
+| `TIMEOUT`               | 408       | 请求超时                           |
+| `CONFLICT`              | 409       | 资源冲突（如重复创建）             |
+| `PRECONDITION_FAILED`   | 412       | 前置条件失败                       |
+| `PAYLOAD_TOO_LARGE`     | 413       | 请求体过大                         |
+| `UNPROCESSABLE_CONTENT` | 422       | 参数合法但无法处理（业务规则冲突） |
+| `TOO_MANY_REQUESTS`     | 429       | 频率限制                           |
+| `CLIENT_CLOSED_REQUEST` | 499 (\*)  | 客户端主动关闭                     |
+| `INTERNAL_SERVER_ERROR` | 500       | 服务端未捕获异常（默认）           |
+| `NOT_IMPLEMENTED`       | 501       | 功能未实现                         |
+| `BAD_GATEWAY`           | 502       | 上游异常                           |
+| `SERVICE_UNAVAILABLE`   | 503       | 服务不可用                         |
+| `GATEWAY_TIMEOUT`       | 504       | 上游超时                           |
+
+<Callout>
+**要点**
+
+- `code` 是 TypeScript 字面量类型，拼写错误编译期就能发现
+- 未 catch 的异常会被 tRPC 包装成 `INTERNAL_SERVER_ERROR`，原始信息在 `cause`
+- 生产环境建议统一捕获并脱敏（`errorFormatter`）
+- `499` 是 Nginx 自定义状态码（`Client Closed Request`），不在 RFC 标准里，但被 tRPC 和主流网关沿用
+
+</Callout>
+
+## 客户端捕获错误
+
+### 纯 Client（Promise）
+
+```ts
+import { TRPCClientError } from "@trpc/client";
+
+try {
+  const user = await trpc.user.byId.query({ id: "x" });
+} catch (err) {
+  if (err instanceof TRPCClientError) {
+    console.log(err.data?.code); // "NOT_FOUND" 等
+    console.log(err.data?.httpStatus); // 404
+    console.log(err.message); // "User not found"
+  }
+}
+```
+
+### React + TanStack Query
+
+```tsx
+const { data, error, isError } = trpc.user.byId.useQuery({ id: "x" });
+
+if (isError) {
+  // error 已被 TanStack Query 标准化
+  if (error.data?.code === "NOT_FOUND") {
+    return <NotFoundPage />;
+  }
+  if (error.data?.code === "UNAUTHORIZED") {
+    return <LoginRedirect />;
+  }
+  return <GenericError message={error.message} />;
+}
+```
+
+Mutation：
+
+```tsx
+const createUser = trpc.user.create.useMutation({
+  onError: (error) => {
+    if (error.data?.code === "CONFLICT") {
+      toast("邮箱已被注册");
+    } else {
+      toast("创建失败，请稍后重试");
+    }
+  },
+});
+```
+
+## errorFormatter（自定义错误序列化）
+
+在初始化 `t` 时传入 `errorFormatter`，可以给客户端看到的错误对象加字段：
+
+```ts
+import { initTRPC } from "@trpc/server";
+import { ZodError } from "zod";
+
+export const t = initTRPC.create({
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        zodError:
+          error.cause instanceof ZodError ? error.cause.flatten() : null,
+      },
+    };
+  },
+});
+```
+
+客户端就能从 `error.data.zodError` 拿到详细的字段级校验错误：
+
+```tsx
+const createUser = trpc.user.create.useMutation({
+  onError: (err) => {
+    const fieldErrors = err.data?.zodError?.fieldErrors;
+    if (fieldErrors?.email) {
+      setEmailError(fieldErrors.email[0]);
+    }
+  },
+});
+```
+
+<Callout>
+**实践建议**
+
+- 开发环境在 `errorFormatter` 里保留 stack / cause，便于调试
+- 生产环境只返回 `code` + `message`，隐藏内部细节
+- 用 `shape.data.httpStatus` 让客户端做 HTTP 状态码级别判断
+
+</Callout>
+
+## 不要做的事
+
+| 反模式                                           | 为什么                                          |
+| ------------------------------------------------ | ----------------------------------------------- |
+| 用 `return { error: "..." }` 模拟错误            | 绕过了 TRPCError 的类型系统，客户端失去类型提示 |
+| 在 procedure 里 `console.error` 后 `return null` | 客户端拿不到错误信息，以为调用成功              |
+| 把所有错误都抛 `INTERNAL_SERVER_ERROR`           | 失去语义，客户端无法区分"参数错"和"服务端异常"  |
+| 生产环境把完整 stack 返回客户端                  | 信息泄漏风险，用 `errorFormatter` 过滤          |
+
+回到 [tRPC 总览](/web-backend/api-communication/trpc)

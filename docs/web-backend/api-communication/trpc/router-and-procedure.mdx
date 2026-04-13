@@ -1,0 +1,341 @@
+---
+title: tRPC Router 与 Procedure
+description: Router / Procedure / Context / Middleware / Client 的定义与组织
+category: web-backend
+tags:
+  - trpc
+  - router
+  - procedure
+created: 2026-04-13
+order: 1
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+本文覆盖 tRPC 服务端和客户端的核心组件：Router、Procedure、Context、Middleware、Client。示例基于 `@trpc/server` / `@trpc/client` v11，前后端同 monorepo。
+
+## 初始化
+
+所有 tRPC 项目从初始化一个 `t` 实例开始。`t` 是 Router / Procedure / Middleware 的工厂。
+
+```ts
+import { initTRPC } from "@trpc/server";
+
+export const t = initTRPC.create();
+
+export const router = t.router;
+export const publicProcedure = t.procedure;
+export const middleware = t.middleware;
+```
+
+带上下文类型的版本（推荐）：
+
+```ts
+import { initTRPC } from "@trpc/server";
+import type { Context } from "./context";
+
+export const t = initTRPC.context<Context>().create();
+
+export const router = t.router;
+export const publicProcedure = t.procedure;
+export const middleware = t.middleware;
+```
+
+## Router
+
+Router 是组织 Procedure 的容器，支持无限嵌套。
+
+```ts
+import { router, publicProcedure } from "./trpc";
+import { z } from "zod";
+
+export const userRouter = router({
+  list: publicProcedure.query(async ({ ctx }) => ctx.db.user.findMany()),
+  byId: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) =>
+      ctx.db.user.findUnique({ where: { id: input.id } }),
+    ),
+});
+
+export const postRouter = router({
+  list: publicProcedure.query(async ({ ctx }) => ctx.db.post.findMany()),
+});
+
+// 顶层 Router：组合子 Router
+export const appRouter = router({
+  user: userRouter,
+  post: postRouter,
+});
+
+export type AppRouter = typeof appRouter;
+```
+
+客户端调用：
+
+```ts
+trpc.user.list.query();
+trpc.user.byId.query({ id: "1" });
+trpc.post.list.query();
+```
+
+<Callout>
+**要点**
+
+- `AppRouter` 只导出**类型**（`export type`），不导出运行时代码，避免客户端打包服务端依赖
+- 子 Router 按业务域拆分（`user`、`post`、`order`）保持可维护
+- 路径深度不限，但建议不超过 3 层
+
+</Callout>
+
+## Procedure
+
+Procedure 是单个 API 端点。分两种：
+
+| 类型       | 用途   | 语义                              |
+| ---------- | ------ | --------------------------------- |
+| `query`    | 读数据 | 幂等，客户端可缓存                |
+| `mutation` | 写数据 | 非幂等，TanStack Query 默认不缓存 |
+
+```ts
+const getUser = publicProcedure
+  .input(z.object({ id: z.string() }))
+  .query(async ({ input, ctx }) => {
+    return ctx.db.user.findUnique({ where: { id: input.id } });
+  });
+
+const createUser = publicProcedure
+  .input(z.object({ name: z.string(), email: z.string().email() }))
+  .mutation(async ({ input, ctx }) => {
+    return ctx.db.user.create({ data: input });
+  });
+```
+
+### input / output
+
+- `.input(zodSchema)`：Zod 校验客户端传入参数，失败自动抛 `BAD_REQUEST`
+- `.output(zodSchema)`（可选）：在开发期校验返回值符合约定，生产环境可关掉省开销
+
+```ts
+const safeProfile = publicProcedure
+  .input(z.object({ id: z.string() }))
+  .output(z.object({ id: z.string(), name: z.string() }))
+  .query(async ({ input, ctx }) => {
+    const u = await ctx.db.user.findUnique({ where: { id: input.id } });
+    return { id: u!.id, name: u!.name };
+  });
+```
+
+<Callout>
+**要点**
+
+Zod 校验是 tRPC 的"类型与运行时"的桥：TypeScript 只保证编译期，Zod 保证实际收到的数据真的是 `{ id: string }`。不加 `.input()` 的 procedure 客户端传什么都会原样转给 handler，运行时没有防护。
+
+</Callout>
+
+## Context
+
+Context 是每次请求共享的对象，通常放数据库连接、session、DataLoader 等。
+
+```ts
+// context.ts
+import { db } from "./db";
+import { getSession } from "./auth";
+
+export async function createContext({ req }: { req: Request }) {
+  const session = await getSession(req);
+  return {
+    db,
+    session,
+    user: session?.user ?? null,
+  };
+}
+
+export type Context = Awaited<ReturnType<typeof createContext>>;
+```
+
+挂载到 HTTP handler（Next.js App Router 示例）：
+
+```ts
+// app/api/trpc/[trpc]/route.ts
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { appRouter } from "@/server/router";
+import { createContext } from "@/server/context";
+
+const handler = (req: Request) =>
+  fetchRequestHandler({
+    endpoint: "/api/trpc",
+    req,
+    router: appRouter,
+    createContext: () => createContext({ req }),
+  });
+
+export { handler as GET, handler as POST };
+```
+
+<Callout>
+**要点：Fetch adapter 只有 `req`**
+
+Next.js App Router / Cloudflare Workers / Deno / Bun 等 Fetch 风格运行时没有 `res` 对象，响应通过 `Response` 返回值表达。Pages Router 或 Express adapter 才会传入 `{ req, res }`。写 `createContext` 签名时按目标 adapter 选参数，不要凑齐两个。
+
+</Callout>
+
+## Middleware
+
+Middleware 在 procedure 执行前后插入逻辑，常用于鉴权、日志、性能监控。
+
+### 鉴权示例
+
+```ts
+const isAuthed = middleware(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({
+    ctx: {
+      // 重写 ctx 类型：user 不再是 nullable
+      user: ctx.user,
+    },
+  });
+});
+
+export const protectedProcedure = publicProcedure.use(isAuthed);
+```
+
+```ts
+const updateProfile = protectedProcedure
+  .input(z.object({ name: z.string() }))
+  .mutation(async ({ input, ctx }) => {
+    // ctx.user 已保证非 null
+    return ctx.db.user.update({
+      where: { id: ctx.user.id },
+      data: { name: input.name },
+    });
+  });
+```
+
+<Callout>
+**要点：ctx 类型收窄**
+
+`next({ ctx: { ... } })` 的返回类型会沿链路**累积**。上面 `isAuthed` 把 `user` 从 `User | null` 收窄为 `User`，下游 procedure 的 `ctx.user` 类型自动收窄。这是 tRPC 鉴权模式的常见用法。
+
+</Callout>
+
+### 日志 / 性能监控
+
+```ts
+const logger = middleware(async ({ path, type, next }) => {
+  const start = Date.now();
+  const result = await next();
+  const durationMs = Date.now() - start;
+  console.log(`[${type}] ${path} - ${durationMs}ms`);
+  return result;
+});
+
+export const loggedProcedure = publicProcedure.use(logger);
+```
+
+## Client
+
+客户端通过 `AppRouter` 类型创建代理。两种常见形态：
+
+### 纯 Client（无 React）
+
+```ts
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import type { AppRouter } from "../server/router";
+
+export const trpc = createTRPCClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: "http://localhost:3000/api/trpc",
+    }),
+  ],
+});
+
+// 使用
+const user = await trpc.user.byId.query({ id: "1" });
+const newUser = await trpc.user.create.mutate({
+  name: "Alice",
+  email: "a@b.c",
+});
+```
+
+### React + TanStack Query
+
+```ts
+// client.ts
+import { createTRPCReact } from "@trpc/react-query";
+import type { AppRouter } from "../server/router";
+
+export const trpc = createTRPCReact<AppRouter>();
+```
+
+```tsx
+// 组件里
+const { data, isLoading } = trpc.user.byId.useQuery({ id: "1" });
+const createUser = trpc.user.create.useMutation();
+
+<button onClick={() => createUser.mutate({ name: "Alice", email: "a@b.c" })}>
+  创建
+</button>;
+```
+
+TanStack Query 的缓存、失效、乐观更新、无限滚动都能直接用。
+
+### httpBatchLink 与 batching
+
+`httpBatchLink` 会把**同一个 tick 内**的多个 procedure 调用自动合并为一个 HTTP 请求：
+
+```txt
+trpc.user.byId.query({ id: "1" })
+trpc.user.byId.query({ id: "2" })
+trpc.post.list.query()
+        │
+        ▼
+  POST /api/trpc/user.byId,user.byId,post.list
+  → 一次 HTTP 请求，服务端并行执行三个 procedure
+```
+
+<Callout>
+**陷阱**
+
+- Batching 让 DevTools Network 面板的请求 URL 形如 `user.byId,user.byId,post.list`，响应是数组，调试时不好读
+- 临时切到非批量的 `httpLink` 单独请求更好排查
+- 大量并发时如果某个 procedure 慢，会拖慢整批（必要时分成多个 `httpBatchLink` 实例）
+
+</Callout>
+
+<Callout>
+**v11 新增 `httpBatchStreamLink`**
+
+tRPC v11 加入 `httpBatchStreamLink`，服务端用 HTTP chunked streaming 让**每个 procedure 单独到达时立即返回**，不用等整批最慢的完成。适合同一批里有快有慢的场景，API 与 `httpBatchLink` 一致，直接替换即可。
+
+</Callout>
+
+## 完整目录结构参考
+
+一个 Next.js + tRPC 项目的典型组织：
+
+```txt
+src/
+├── server/
+│   ├── trpc.ts              # initTRPC + 导出 router / publicProcedure / middleware
+│   ├── context.ts           # createContext + Context 类型
+│   ├── routers/
+│   │   ├── user.ts          # userRouter
+│   │   ├── post.ts          # postRouter
+│   │   └── _app.ts          # appRouter = router({ user, post, ... })
+│   └── middlewares/
+│       └── auth.ts          # isAuthed / protectedProcedure
+│
+├── app/api/trpc/[trpc]/
+│   └── route.ts             # fetchRequestHandler 挂载
+│
+└── shared/
+    └── trpc.ts              # createTRPCReact<AppRouter>()
+```
+
+回到 [tRPC 总览](/web-backend/api-communication/trpc)

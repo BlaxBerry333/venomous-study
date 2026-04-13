@@ -1,0 +1,203 @@
+---
+title: GraphQL
+description: 客户端按需查询、服务端统一 Schema 的 API 查询语言
+category: web-backend
+tags:
+  - graphql
+  - api
+created: 2026-04-13
+order: 0
+---
+
+import Callout from "@components/Callout.astro";
+
+# {frontmatter.title}
+
+GraphQL 是一种 API 查询语言——**后端定义数据结构（Schema），前端按需查询所需字段**。所有请求走单一端点（通常 `POST /graphql`），由客户端在查询语句中精确指定要哪些字段。
+
+<Callout>
+**特点**
+
+- 单一端点（`POST /graphql`）处理所有请求
+- 客户端精确指定所需字段，避免 Over-fetching（返回多余字段）和 Under-fetching（一个页面调多个接口）
+- 强类型 Schema 定义数据结构，自带 API 文档
+- 内置 Subscription 支持实时数据推送（底层可基于 WebSocket）
+
+</Callout>
+
+<Callout>
+**局限**
+
+- 嵌套查询容易触发 [N+1 问题](/web-backend/api-communication/graphql/n-plus-one-and-dataloader)，必须引入 DataLoader
+- 所有请求 `POST /graphql`，无法利用 HTTP 缓存和 CDN，需[客户端缓存方案](/web-backend/api-communication/graphql/caching-and-security#客户端缓存)
+- HTTP 状态码始终 `200`，日志和监控需额外适配
+- 客户端可构造任意查询，需额外实现[深度限制、复杂度限制、持久化查询](/web-backend/api-communication/graphql/caching-and-security#服务端安全限制)
+- 服务端要维护 Schema + Resolver + DataLoader + 权限控制，比 REST 重
+
+</Callout>
+
+<Callout>
+**适用场景**
+
+- 多客户端（Web / Mobile）共用一套 API（GitHub API v4）
+- 移动端省流量
+- 数据关系复杂的产品需要灵活组合（Shopify、Yelp）
+- 前后端团队分离各自迭代
+
+</Callout>
+
+## REST vs GraphQL 的数据形态
+
+```txt
+┏━━━━━━━━━━ REST API ━━━━━━━━━━━┓
+┃                               ┃
+┃  GET /api/user/1              ┃  → { id, name, email, avatar, bio, ... }
+┃  GET /api/user/1/posts        ┃  → [{ id, title, content, ... }, ...]
+┃  GET /api/user/1/followers    ┃  → [{ id, name, ... }, ...]
+┃                               ┃
+┃  3 个请求，每个可能返回多余字段 ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+┏━━━━━━━━━ GraphQL API ━━━━━━━━━┓
+┃                               ┃
+┃  POST /graphql                ┃    {
+┃  query {                      ┃      user: {
+┃    user(id: 1) {              ┃        name: "Alice",
+┃      name                     ┃  →     posts: [{ title: "..." }],
+┃      followers { name }       ┃        followers: [{ name: "..." }]
+┃    }                          ┃      }
+┃  }                            ┃    }
+┃                               ┃
+┃  1 个请求，只返回所需字段      ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+```
+
+## 基础概念
+
+| 概念         | 谁负责 | 一句话说明                                  | 详细                                                                        |
+| ------------ | ------ | ------------------------------------------- | --------------------------------------------------------------------------- |
+| Schema       | 后端   | 定义有哪些数据类型和操作接口（API 的契约）  | [详见](/web-backend/api-communication/graphql/schema-and-resolver#schema)   |
+| Resolver     | 后端   | 每个字段如何获取数据的函数                  | [详见](/web-backend/api-communication/graphql/schema-and-resolver#resolver) |
+| Query        | 前端   | 按需查询数据（类似 GET）                    | [详见](/web-backend/api-communication/graphql/schema-and-resolver#操作类型) |
+| Mutation     | 前端   | 按需修改数据（类似 POST/PUT/DELETE）        | [详见](/web-backend/api-communication/graphql/schema-and-resolver#操作类型) |
+| Subscription | 前端   | 订阅实时数据推送（底层常用 WebSocket）      | [详见](/web-backend/api-communication/graphql/schema-and-resolver#操作类型) |
+| codegen      | 工具   | 读取后端 Schema，为前端生成 TypeScript 类型 | [详见](/web-backend/api-communication/graphql/schema-and-resolver#codegen)  |
+
+<Callout>
+**要点：Schema 和 Query 的关系**
+
+Schema 和 Query 语法看起来很像（都用花括号描述结构），但本质完全不同：
+
+- **Schema**（后端写）= 类型定义，声明"有什么数据、什么类型"，类似数据库建表 `CREATE TABLE`
+- **Query**（前端写）= 查询语句，从 Schema 定义的字段中"挑这次要哪些"，类似 `SELECT name, title FROM ...`
+
+Schema 整个 API 只有一份（后端维护），Query 有很多份（每个页面/组件按需写不同的查询）。
+
+</Callout>
+
+## 基本流程
+
+```txt
+①  后端定义 Schema（SDL）
+        │
+②  后端实现 Resolver（每个字段如何取数据）
+        │
+③  codegen 读取 Schema → 生成前端 TS 类型
+        │
+④  前端写 Query / Mutation → 发到 /graphql 端点
+        │
+⑤  服务端执行对应 Resolver → 返回 JSON
+```
+
+详细步骤：
+
+1. **后端定义 Schema** —— 用 SDL 声明数据类型和操作接口（[详见](/web-backend/api-communication/graphql/schema-and-resolver#schema)）
+2. **后端实现 Resolver** —— 为 Schema 中的每个字段编写数据获取逻辑（[详见](/web-backend/api-communication/graphql/schema-and-resolver#resolver)）
+3. **codegen 生成类型** —— 读取后端 Schema，为前端生成 TypeScript 类型（[详见](/web-backend/api-communication/graphql/schema-and-resolver#codegen)）
+4. **前端写查询语句** —— 用 Query/Mutation 指定需要的字段（[详见](/web-backend/api-communication/graphql/schema-and-resolver#操作类型)）
+
+## 多服务合并：Federation 与 Schema Stitching
+
+企业级 GraphQL 常有多个后端服务，需要把各自的 Schema 合并成一张大图：
+
+| 方案                              | 说明                                                                                                            |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Apollo Federation**（事实标准） | 每个子服务（subgraph）声明自己负责的类型和字段，Gateway 用 `@key` / `@extends` 等指令组合；支持跨服务的关联查询 |
+| **Schema Stitching**              | 老方案，Gateway 运行时合并多个远端 Schema；灵活但重构频繁、Apollo 已降为替代选项                                |
+| **GraphQL Mesh**                  | 更通用的"聚合层"，能把 REST / gRPC / OpenAPI / 数据库当 GraphQL 源                                              |
+
+<Callout>
+**选型**
+
+- 多团队多后端、期望跨服务关联查询 → Apollo Federation
+- 已有异构服务（REST / gRPC）想统一出口 → GraphQL Mesh
+- 单 GraphQL 服务 → 不需要 Federation，直接单 Schema 即可
+
+</Callout>
+
+## 争议与取舍
+
+GraphQL 的核心优势是**客户端灵活查询**。但这个灵活性不是免费的，它带来了一系列成本：
+
+| 成本         | 具体问题                                                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| N+1 问题     | 嵌套查询天然触发逐条查询，必须引入 [DataLoader](/web-backend/api-communication/graphql/n-plus-one-and-dataloader)                              |
+| 缓存         | 所有请求 `POST /graphql`，HTTP 缓存和 CDN 完全失效，必须用[客户端缓存](/web-backend/api-communication/graphql/caching-and-security#客户端缓存) |
+| 安全         | 客户端可构造任意查询，必须额外实现[深度 / 复杂度限制](/web-backend/api-communication/graphql/caching-and-security#服务端安全限制)              |
+| 监控         | HTTP 状态码始终 200，传统监控体系需要额外适配                                                                                                  |
+| 服务端复杂度 | 维护 Schema + Resolver + DataLoader + 权限控制，每新增字段都要写 Resolver                                                                      |
+| 开发流程     | 后端写 Schema → Resolver → codegen → 前端写 Query → codegen 再生成 Hook，改一个字段要动多处                                                    |
+
+<Callout>
+**选型判断**
+
+当场景不需要"客户端灵活查询"这个能力时，上面这些成本就变成了纯开销。
+
+- 适合 GraphQL：多客户端共用 API、数据关系复杂需要灵活组合、前后端分离各自迭代
+- 不适合：TS 全栈项目用 [tRPC](/web-backend/api-communication/trpc) 成本更低，简单 CRUD / 公开 API 用 REST 更成熟，微服务间通信用 [gRPC](/web-backend/api-communication/grpc) 更合适
+
+</Callout>
+
+## GraphQL vs tRPC
+
+都解决了 REST 的类型安全问题，但思路完全不同：
+
+| 维度       | GraphQL                                                | tRPC                                                                                                      |
+| ---------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| 语言和受众 | 任意语言，可对外暴露给第三方                           | **仅 TypeScript**，前后端同语言同团队                                                                     |
+| 查询灵活度 | 前端自由选字段，不同客户端按需查询                     | 服务端决定返回什么，前端只能调用                                                                          |
+| 开发成本   | Schema → Resolver → codegen → Query，改一个字段动 4 处 | 写个函数就是 API，零 codegen                                                                              |
+| 错误和缓存 | 始终 200 + `errors`，需 Apollo Cache                   | 标准 HTTP 状态码 + [TRPCError](/web-backend/api-communication/trpc/error-handling)，TanStack Query 管缓存 |
+| 实时通信   | 内置 Subscription                                      | 支持 subscription procedure，生态不如 GraphQL 成熟                                                        |
+| 生态       | 成熟（Apollo/Relay/urql）                              | 较小，围绕 Next.js / TanStack Query                                                                       |
+| 适合场景   | 对外 API、多客户端、多语言                             | TS 全栈内部项目、同一团队                                                                                 |
+
+<Callout>
+**怎么判断**
+
+1. **先看语言限制**：有非 TS 客户端或第三方要消费 API → tRPC 直接排除，选 GraphQL
+2. **再看是否需要灵活查询**：多客户端需要不同字段组合 → GraphQL；单客户端固定结构 → tRPC 开发成本低得多
+
+</Callout>
+
+## GraphQL vs REST
+
+| 维度     | GraphQL                                      | REST                                       |
+| -------- | -------------------------------------------- | ------------------------------------------ |
+| 数据获取 | 客户端精确指定字段，一次请求拿关联数据       | 服务端决定返回结构，可能多余字段或多次请求 |
+| N+1 问题 | 嵌套查询天然触发，必须引入 DataLoader        | Controller 层一次性 JOIN，不存在           |
+| 缓存     | HTTP 缓存失效，需客户端缓存                  | HTTP 原生缓存 + CDN                        |
+| 安全     | 客户端可构造任意查询，需深度/复杂度限制      | 端点固定，服务端完全控制查询               |
+| 错误处理 | 始终 200 + `errors` 字段，支持部分成功       | HTTP 状态码（404/500 等）                  |
+| API 演进 | 新增字段不影响旧客户端，不需要版本号         | 需版本控制（v1/v2）或 Header               |
+| 文件上传 | JSON 不支持二进制，需额外方案                | 原生支持 multipart                         |
+| 适合场景 | 多客户端灵活查询、数据关系复杂、BFF 服务多端 | 简单 CRUD、公开 API、需要 HTTP 缓存/CDN    |
+
+<Callout>
+**怎么判断**
+
+1. **先看客户端数量**：多客户端需要不同字段组合 → GraphQL 的灵活查询有价值
+2. **再看基础设施需求**：需要 HTTP 缓存/CDN/标准监控 → REST 全链路成熟，GraphQL 每项都要额外方案
+
+</Callout>
