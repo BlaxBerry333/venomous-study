@@ -304,10 +304,10 @@ export const TRAITOR_LEGIONS: readonly TraitorLegion[] = [
     name: "Alpha Legion",
     heresyName: "Alpha Legion",
     label: "XX. Alpha Legion",
-    heresyLabel: "Alpharius · Alpha Legion",
+    heresyLabel: "??? · Alpha Legion",
     logoName: "imperial--alpha-legion",
     heresyLogoName: "chaos--alpha-legion",
-    primarch: "Alpharius Omegon",
+    primarch: "Alpharius · Omegon",
     homeworld: "Unknown",
     epithet: "Hydra Dominatus",
     description:
